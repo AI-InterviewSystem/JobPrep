@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #0058bd;
+  --color-primary-dark: #004494;
+  --color-brand-navy: #013066;
+  --color-brand-blue-1: #55CAF6;
+  --color-brand-blue-2: #83E2FE;
+  --color-brand-blue-3: #B1F0FF;
+  --color-background-light: #ffffff;
+  --color-background-dark: #0f1823;
+  --font-display: "Inter", sans-serif;
+
+  --breakpoint-xs: 480px;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@layer base {
+  body {
+    @apply bg-[#ffffff] font-display text-slate-900;
+    margin: 0;
+    min-height: 100vh;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-primary;
+  }
+}
+
+/* Custom Animations */
+@keyframes entry {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-entry {
+  animation: entry 0.6s ease-out forwards;
+}
+
+/* Pricing Card Animations (from PricingPage.html) */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 300ms ease-out forwards;
+}
+
+.pricing-card-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.pricing-card-hover:hover {
+  transform: translateY(-8px);
+  @apply shadow-2xl;
+}
+
+.btn-hover-effect {
+  transition: all 0.2s ease-in-out;
+}
+
+.btn-hover-effect:hover {
+  transform: scale(1.02);
+  filter: brightness(110%);
+}
