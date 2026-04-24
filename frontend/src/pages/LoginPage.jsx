@@ -4,52 +4,24 @@ import { motion } from "framer-motion"
 import { authApi } from "../services/api"
 import logo from "../assets/images/jobprep-logo.png"
 
-export default function SignupPage() {
-    const [formData, setFormData] = useState({
-        email: "",
-        password: "",
-        confirmPassword: "",
-        fullName: ""
-    })
-    const [error, setError] = useState({})
-    const [passwordError, setPasswordError] = useState("")
+export default function LoginPage() {
+    const [email, setEmail] = useState("")
+    const [password, setPassword] = useState("")
+    const [error, setError] = useState("")
     const [loading, setLoading] = useState(false)
     const navigate = useNavigate()
 
-    const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value })
-    }
-
     const handleSubmit = async (e) => {
         e.preventDefault()
-        setError({})
-        setPasswordError("")
-
-        // Frontend validation
-        if (formData.password !== formData.confirmPassword) {
-            setPasswordError("Passwords do not match")
-            return
-        }
-
-        const passwordRegex = /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$/
-        if (!passwordRegex.test(formData.password)) {
-            setPasswordError("Password must be at least 8 characters and contain a letter, a number, and a special character")
-            return
-        }
-
+        setError("")
         setLoading(true)
         try {
-            // Send only required data to backend
-            const { confirmPassword, ...registerData } = formData
-            await authApi.register(registerData)
-            // Redirect to OTP page instead of dashboard
-            navigate(`/verify-otp?email=${encodeURIComponent(formData.email)}`)
+            const response = await authApi.login({ email, password })
+            localStorage.setItem("token", response.data.token)
+            localStorage.setItem("user", JSON.stringify(response.data.user))
+            navigate("/dashboard")
         } catch (err) {
-            if (err.response?.data) {
-                setError(err.response.data)
-            } else {
-                setError({ message: "Something went wrong" })
-            }
+            setError(err.response?.data?.message || "Invalid email or password")
         } finally {
             setLoading(false)
         }
@@ -69,8 +41,8 @@ export default function SignupPage() {
                         <span className="font-bold text-gray-900">JobPrep</span>
                     </Link>
                     <div className="text-sm text-gray-500">
-                        Already have an account?{" "}
-                        <Link to="/login" className="text-primary font-semibold hover:underline">Log in</Link>
+                        Don't have an account?{" "}
+                        <Link to="/signup" className="text-primary font-semibold hover:underline">Sign up</Link>
                     </div>
                 </div>
             </header>
@@ -82,9 +54,9 @@ export default function SignupPage() {
                     transition={{ duration: 0.6 }}
                     className="w-full max-w-md"
                 >
-                    <h1 className="text-4xl font-extrabold text-gray-900 text-center mb-2">Start your journey</h1>
+                    <h1 className="text-4xl font-extrabold text-gray-900 text-center mb-2">Welcome back</h1>
                     <p className="text-gray-500 text-center mb-8">
-                        Join JobPrep today and land your dream role with AI-powered interview prep.
+                        Log in to continue your interview preparation.
                     </p>
 
                     <div className="flex gap-4 mb-6">
@@ -104,71 +76,40 @@ export default function SignupPage() {
 
                     <div className="flex items-center gap-4 mb-6">
                         <div className="h-px flex-1 bg-gray-200"></div>
-                        <span className="text-sm text-gray-400">Or continue with email</span>
+                        <span className="text-sm text-gray-400">Or log in with email</span>
                         <div className="h-px flex-1 bg-gray-200"></div>
                     </div>
 
                     <form className="space-y-4" onSubmit={handleSubmit}>
-                        {error.message && (
+                        {error && (
                             <div className="bg-red-50 text-red-600 text-sm p-3 rounded-xl border border-red-100">
-                                {error.message}
+                                {error}
                             </div>
                         )}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
-                            <input
-                                type="text"
-                                name="fullName"
-                                value={formData.fullName}
-                                onChange={handleChange}
-                                placeholder="John Doe"
-                                required
-                                className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
-                            />
-                            {error.fullName && <p className="text-xs text-red-500 mt-1">{error.fullName}</p>}
-                        </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Email address</label>
                             <input
                                 type="email"
-                                name="email"
-                                value={formData.email}
-                                onChange={handleChange}
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
                                 placeholder="you@company.com"
                                 required
                                 className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
                             />
-                            {error.email && <p className="text-xs text-red-500 mt-1">{error.email}</p>}
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                            <div className="flex items-center justify-between mb-2">
+                                <label className="block text-sm font-medium text-gray-700">Password</label>
+                                <Link to="/forgot-password" weights="medium" className="text-xs text-primary hover:underline font-medium">Forgot password?</Link>
+                            </div>
                             <input
                                 type="password"
-                                name="password"
-                                value={formData.password}
-                                onChange={handleChange}
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
                                 placeholder="••••••••"
                                 required
                                 className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
                             />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Confirm Password</label>
-                            <input
-                                type="password"
-                                name="confirmPassword"
-                                value={formData.confirmPassword}
-                                onChange={handleChange}
-                                placeholder="••••••••"
-                                required
-                                className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
-                            />
-                            {passwordError && <p className="text-xs text-red-500 mt-1">{passwordError}</p>}
-                            {error.password && <p className="text-xs text-red-500 mt-1">{error.password}</p>}
-                            <p className="text-xs text-gray-400 mt-2">
-                                Must be at least 8 characters, include a letter, a number, and a special character.
-                            </p>
                         </div>
 
                         <button
@@ -176,7 +117,7 @@ export default function SignupPage() {
                             disabled={loading}
                             className="w-full bg-primary text-white font-bold py-3.5 rounded-full hover:bg-primary-dark transition-all hover:shadow-lg disabled:opacity-50"
                         >
-                            {loading ? "Creating Account..." : "Create Account"}
+                            {loading ? "Logging in..." : "Log In"}
                         </button>
                     </form>
                 </motion.div>
