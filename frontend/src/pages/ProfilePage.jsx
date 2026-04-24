@@ -26,6 +26,23 @@ export default function ProfilePage() {
         try {
             const response = await profileApi.getProfile()
             setProfile(response.data)
+
+            try {
+                const raw = localStorage.getItem("user")
+                const current = raw ? JSON.parse(raw) : {}
+                localStorage.setItem(
+                    "user",
+                    JSON.stringify({
+                        ...current,
+                        fullName: response.data.fullName ?? current.fullName,
+                        avatarUrl: response.data.avatarUrl ?? current.avatarUrl,
+                    })
+                )
+                window.dispatchEvent(new Event("jobprep:user-updated"))
+            } catch {
+                // ignore
+            }
+
             setFormData({
                 fullName: response.data.fullName || "",
                 phone: response.data.phone || "",
@@ -45,6 +62,23 @@ export default function ProfilePage() {
         try {
             const response = await profileApi.updateProfile(formData)
             setProfile(response.data)
+
+            try {
+                const raw = localStorage.getItem("user")
+                const current = raw ? JSON.parse(raw) : {}
+                localStorage.setItem(
+                    "user",
+                    JSON.stringify({
+                        ...current,
+                        fullName: response.data.fullName ?? current.fullName,
+                        avatarUrl: response.data.avatarUrl ?? current.avatarUrl,
+                    })
+                )
+                window.dispatchEvent(new Event("jobprep:user-updated"))
+            } catch {
+                // ignore
+            }
+
             setEditMode(false)
             setMsg({ text: "Profile updated successfully", type: "success" })
         } catch (err) {

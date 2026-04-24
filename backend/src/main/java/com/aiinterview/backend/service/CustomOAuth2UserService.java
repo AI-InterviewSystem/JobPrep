@@ -5,6 +5,7 @@ import com.aiinterview.backend.entity.User;
 import com.aiinterview.backend.repository.ProfileRepository;
 import com.aiinterview.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
@@ -16,6 +17,7 @@ import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
     private final UserRepository userRepository;
@@ -35,10 +37,12 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         if (userOptional.isPresent()) {
             user = userOptional.get();
             if (user.getGoogleId() == null) {
+                log.info("Linking existing user {} with Google ID: {}", email, googleId);
                 user.setGoogleId(googleId);
-                userRepository.save(user);
+                userRepository.saveAndFlush(user);
             }
         } else {
+            log.info("Creating new Google user: {}", email);
             user = User.builder()
                     .email(email)
                     .googleId(googleId)

@@ -68,10 +68,7 @@ export default function SignupPage() {
                         <img src={logo} alt="JobPrep" className="h-8" />
                         <span className="font-bold text-gray-900">JobPrep</span>
                     </Link>
-                    <div className="text-sm text-gray-500">
-                        Already have an account?{" "}
-                        <Link to="/login" className="text-primary font-semibold hover:underline">Log in</Link>
-                    </div>
+                    <div />
                 </div>
             </header>
 
@@ -179,6 +176,11 @@ export default function SignupPage() {
                             {loading ? "Creating Account..." : "Create Account"}
                         </button>
                     </form>
+
+                    <div className="mt-6 text-center text-sm text-gray-500">
+                        Already have an account?{" "}
+                        <Link to="/login" className="text-primary font-semibold hover:underline">Log in</Link>
+                    </div>
                 </motion.div>
             </main>
 

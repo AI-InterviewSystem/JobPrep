@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom"
 import { motion } from "framer-motion"
 import logo from "../assets/images/jobprep-logo.png"
+import AvatarMenu from "../components/layout/AvatarMenu"
 
 const steps = [
     {
@@ -57,30 +58,38 @@ const footerLinks = {
 }
 
 export default function LandingPage() {
+    const token = localStorage.getItem("token")
+
     return (
         <div className="min-h-screen bg-background-light font-display">
             {/* Navbar */}
             <header className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/80 backdrop-blur-md">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex h-16 items-center justify-between">
-                        <div className="flex items-center gap-12">
-                            <Link to="/" className="flex items-center gap-2">
+                        <div className="w-48 flex-shrink-0">
+                            <Link to={token ? "/dashboard" : "/"} className="flex items-center gap-2">
                                 <img src={logo} alt="JobPrep" className="h-8 w-auto" />
                                 <span className="text-xl font-bold text-primary">JobPrep</span>
                             </Link>
-
-                            <nav className="hidden md:flex items-center gap-8">
-                                <a href="#how-it-works" className="text-sm font-semibold text-slate-700 hover:text-primary transition-colors">How It Works</a>
-                                <a href="#features" className="text-sm font-semibold text-slate-700 hover:text-primary transition-colors">Features</a>
-                                <Link to="/pricing" className="text-sm font-semibold text-slate-700 hover:text-primary transition-colors">Pricing</Link>
-                            </nav>
                         </div>
 
-                        <div className="flex items-center gap-4">
-                            <Link to="/signup" className="text-sm font-bold text-slate-700 hover:text-primary transition-colors">Login</Link>
-                            <Link to="/register" className="bg-primary hover:bg-primary-dark text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-xl shadow-primary/25 transition-all">
-                                Get Started
-                            </Link>
+                        <nav className="hidden md:flex flex-1 justify-center items-center gap-8">
+                            <a href="#how-it-works" className="text-sm font-semibold text-slate-700 hover:text-primary transition-colors">How It Works</a>
+                            <a href="#features" className="text-sm font-semibold text-slate-700 hover:text-primary transition-colors">Features</a>
+                            <Link to="/pricing" className="text-sm font-semibold text-slate-700 hover:text-primary transition-colors">Pricing</Link>
+                        </nav>
+
+                        <div className="w-48 flex-shrink-0 flex items-center justify-end gap-4">
+                            {!token ? (
+                                <>
+                                    <Link to="/login" className="text-sm font-bold text-slate-700 hover:text-primary transition-colors">Login</Link>
+                                    <Link to="/signup" className="bg-primary hover:bg-primary-dark text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-xl shadow-primary/25 transition-all">
+                                        Get Started
+                                    </Link>
+                                </>
+                            ) : (
+                                <AvatarMenu />
+                            )}
                         </div>
                     </div>
                 </div>

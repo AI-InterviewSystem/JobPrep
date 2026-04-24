@@ -10,8 +10,14 @@ export default function ResetPasswordPage() {
     const navigate = useNavigate()
     
     const [password, setPassword] = useState("")
+    const [confirmPassword, setConfirmPassword] = useState("")
     const [status, setStatus] = useState({ text: "", type: "" })
     const [loading, setLoading] = useState(false)
+
+    const validatePassword = (pass) => {
+        const regex = /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[@$!%*#?&]).{8,}$/
+        return regex.test(pass)
+    }
 
     const handleSubmit = async (e) => {
         e.preventDefault()
@@ -19,6 +25,17 @@ export default function ResetPasswordPage() {
             setStatus({ text: "Missing reset token", type: "error" })
             return
         }
+
+        if (password !== confirmPassword) {
+            setStatus({ text: "Passwords do not match", type: "error" })
+            return
+        }
+
+        if (!validatePassword(password)) {
+            setStatus({ text: "Password must be at least 8 characters long and contain at least one letter, one number, and one special character.", type: "error" })
+            return
+        }
+
         setStatus({ text: "", type: "" })
         setLoading(true)
         try {
@@ -26,7 +43,8 @@ export default function ResetPasswordPage() {
             setStatus({ text: "Password reset successful! Redirecting to login...", type: "success" })
             setTimeout(() => navigate("/login"), 3000)
         } catch (err) {
-            setStatus({ text: err.response?.data?.message || "Something went wrong.", type: "error" })
+            const message = err.response?.data?.message || err.response?.data || "Something went wrong."
+            setStatus({ text: typeof message === 'string' ? message : "Invalid password format.", type: "error" })
         } finally {
             setLoading(false)
         }
@@ -71,7 +89,19 @@ export default function ResetPasswordPage() {
                                 required
                                 className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
                             />
-                            <p className="text-xs text-gray-400 mt-2">Must be at least 8 characters long.</p>
+                            <p className="text-xs text-gray-400 mt-2">At least 8 chars, 1 letter, 1 number, 1 special char.</p>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Confirm New Password</label>
+                            <input
+                                type="password"
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                placeholder="••••••••"
+                                required
+                                className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                            />
                         </div>
 
                         <button

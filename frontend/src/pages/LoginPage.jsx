@@ -40,10 +40,7 @@ export default function LoginPage() {
                         <img src={logo} alt="JobPrep" className="h-8" />
                         <span className="font-bold text-gray-900">JobPrep</span>
                     </Link>
-                    <div className="text-sm text-gray-500">
-                        Don't have an account?{" "}
-                        <Link to="/signup" className="text-primary font-semibold hover:underline">Sign up</Link>
-                    </div>
+                    <div />
                 </div>
             </header>
 
@@ -120,6 +117,11 @@ export default function LoginPage() {
                             {loading ? "Logging in..." : "Log In"}
                         </button>
                     </form>
+
+                    <div className="mt-6 text-center text-sm text-gray-500">
+                        Don't have an account?{" "}
+                        <Link to="/signup" className="text-primary font-semibold hover:underline">Sign up</Link>
+                    </div>
                 </motion.div>
             </main>
 
