@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom"
 import logo from "../../assets/images/jobprep-logo.png"
+import AvatarMenu from "./AvatarMenu"
 
 export default function Navbar() {
     return (
@@ -44,12 +45,7 @@ export default function Navbar() {
                             </Link>
                         </>
                     ) : (
-                        <Link
-                            to="/dashboard"
-                            className="bg-blue-600 text-white px-6 py-2.5 rounded-full text-sm font-bold hover:bg-blue-700 transition-all"
-                        >
-                            Dashboard
-                        </Link>
+                        <AvatarMenu />
                     )}
                 </div>
 

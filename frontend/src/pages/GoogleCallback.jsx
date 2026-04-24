@@ -1,5 +1,6 @@
 import { useEffect } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
+import { profileApi } from "../services/api"
 
 export default function GoogleCallback() {
     const [searchParams] = useSearchParams()
@@ -7,13 +8,25 @@ export default function GoogleCallback() {
 
     useEffect(() => {
         const token = searchParams.get("token")
-        if (token) {
+        const run = async () => {
+            if (!token) {
+                navigate("/login?error=google_failed")
+                return
+            }
+
             localStorage.setItem("token", token)
-            // Note: We'd ideally fetch user data here too if not in token
+            try {
+                const response = await profileApi.getProfile()
+                localStorage.setItem("user", JSON.stringify(response.data))
+                window.dispatchEvent(new Event("jobprep:user-updated"))
+            } catch {
+                // ignore
+            }
+
             navigate("/dashboard")
-        } else {
-            navigate("/login?error=google_failed")
         }
+
+        run()
     }, [searchParams, navigate])
 
     return (

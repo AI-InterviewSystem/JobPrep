@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom"
 import { motion } from "framer-motion"
 import logo from "../assets/images/jobprep-logo.png"
+import AvatarMenu from "../components/layout/AvatarMenu"
 
 const plans = [
     {
@@ -67,12 +68,14 @@ const XIcon = () => (
 )
 
 export default function PricingPage() {
+    const token = localStorage.getItem("token")
+
     return (
         <div className="min-h-screen bg-gray-50 font-display">
             {/* Navbar */}
             <header className="border-b border-gray-100 bg-white">
                 <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-4">
-                    <Link to="/" className="flex items-center gap-2">
+                    <Link to={token ? "/dashboard" : "/"} className="flex items-center gap-2">
                         <img src={logo} alt="JobPrep" className="h-8" />
                         <span className="font-bold text-gray-900">JobPrep</span>
                     </Link>
@@ -83,8 +86,14 @@ export default function PricingPage() {
                         <a href="#" className="hover:text-primary transition-colors">Contact</a>
                     </nav>
                     <div className="flex items-center gap-4">
-                        <Link to="/signup" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">Log In</Link>
-                        <Link to="/signup" className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-dark transition-colors">Get Started</Link>
+                        {!token ? (
+                            <>
+                                <Link to="/login" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">Log In</Link>
+                                <Link to="/signup" className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-dark transition-colors">Get Started</Link>
+                            </>
+                        ) : (
+                            <AvatarMenu />
+                        )}
                     </div>
                 </div>
             </header>

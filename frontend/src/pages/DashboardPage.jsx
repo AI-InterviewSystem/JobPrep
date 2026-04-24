@@ -1,8 +1,11 @@
 import { Link } from "react-router-dom"
 import { motion } from "framer-motion"
 import logo from "../assets/images/jobprep-logo.png"
+import AvatarMenu from "../components/layout/AvatarMenu"
 
 export default function DashboardPage() {
+    const token = localStorage.getItem("token")
+
     return (
         <div className="bg-[#f8fafc] font-display text-slate-900 min-h-screen">
             <div className="relative flex h-auto min-h-screen w-full flex-col group/design-root overflow-x-hidden">
@@ -11,7 +14,7 @@ export default function DashboardPage() {
                     <header className="flex items-center justify-between border-b border-primary/10 bg-white px-6 lg:px-8 h-20 shrink-0 sticky top-0 z-50">
                         <div className="max-w-7xl mx-auto w-full flex items-center justify-between">
                             <div className="flex items-center gap-4">
-                                <Link to="/" className="flex items-center gap-2">
+                                <Link to={token ? "/dashboard" : "/"} className="flex items-center gap-2">
                                     <img src={logo} alt="JobPrep" className="h-8 w-auto" />
                                     <span className="text-xl font-bold text-primary">JobPrep</span>
                                 </Link>
@@ -25,12 +28,7 @@ export default function DashboardPage() {
                             </div>
 
                             <div className="flex items-center gap-4">
-                                <button className="bg-primary/5 hover:bg-primary/10 text-primary px-5 py-2 rounded-xl text-sm font-bold transition-all">
-                                    Profile
-                                </button>
-                                <div className="h-10 w-10 rounded-full border-2 border-primary/20 p-0.5 overflow-hidden bg-slate-200 cursor-pointer">
-                                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Alex" alt="Avatar" className="h-full w-full rounded-full object-cover" />
-                                </div>
+                                <AvatarMenu />
                             </div>
                         </div>
                     </header>
