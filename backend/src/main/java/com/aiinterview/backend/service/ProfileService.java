@@ -37,6 +37,7 @@ public class ProfileService {
                 .avatarUrl(profile.getAvatarUrl())
                 .timezone(profile.getTimezone())
                 .emailVerified(user.getEmailVerified())
+                .role(user.getRole())
                 .build();
     }
 

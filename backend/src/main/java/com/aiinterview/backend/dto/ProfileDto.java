@@ -19,4 +19,5 @@ public class ProfileDto {
     private String avatarUrl;
     private String timezone;
     private Boolean emailVerified;
+    private String role;
 }

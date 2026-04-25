@@ -72,32 +72,6 @@ export default function PricingPage() {
 
     return (
         <div className="min-h-screen bg-gray-50 font-display">
-            {/* Navbar */}
-            <header className="border-b border-gray-100 bg-white">
-                <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-4">
-                    <Link to={token ? "/dashboard" : "/"} className="flex items-center gap-2">
-                        <img src={logo} alt="JobPrep" className="h-8" />
-                        <span className="font-bold text-gray-900">JobPrep</span>
-                    </Link>
-                    <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-600">
-                        <a href="#" className="hover:text-primary transition-colors">Features</a>
-                        <Link to="/pricing" className="text-primary font-semibold">Pricing</Link>
-                        <a href="#" className="hover:text-primary transition-colors">About</a>
-                        <a href="#" className="hover:text-primary transition-colors">Contact</a>
-                    </nav>
-                    <div className="flex items-center gap-4">
-                        {!token ? (
-                            <>
-                                <Link to="/login" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">Log In</Link>
-                                <Link to="/signup" className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-dark transition-colors">Get Started</Link>
-                            </>
-                        ) : (
-                            <AvatarMenu />
-                        )}
-                    </div>
-                </div>
-            </header>
-
             <main className="max-w-5xl mx-auto px-6 py-16">
                 {/* Header */}
                 <div className="text-center mb-16 animate-entry">

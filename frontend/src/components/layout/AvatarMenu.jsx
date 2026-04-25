@@ -23,14 +23,32 @@ function getAvatarUrl(user) {
     )
 }
 
+function normalizeAvatarUrl(url) {
+    if (!url) return ""
+    if (url.startsWith("/")) {
+        const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/ai-interview"
+        return `${baseUrl}${url}`
+    }
+    return url
+}
+
 export default function AvatarMenu() {
     const navigate = useNavigate()
     const [open, setOpen] = useState(false)
     const [user, setUser] = useState(() => safeParseUser())
+    const [cacheKey, setCacheKey] = useState(0)
+    const [imgError, setImgError] = useState(false)
 
     const rootRef = useRef(null)
 
-    const avatarUrl = getAvatarUrl(user)
+    const rawAvatarUrl = getAvatarUrl(user)
+    const avatarUrl = normalizeAvatarUrl(rawAvatarUrl)
+    const defaultAvatar = "https://api.dicebear.com/7.x/avataaars/svg?seed=JobPrep"
+
+    useEffect(() => {
+        setImgError(false)
+        if (rawAvatarUrl) setCacheKey(Date.now())
+    }, [rawAvatarUrl])
 
     useEffect(() => {
         const handleStorage = (e) => {
@@ -79,9 +97,10 @@ export default function AvatarMenu() {
                 aria-expanded={open}
             >
                 <img
-                    src={avatarUrl || "https://api.dicebear.com/7.x/avataaars/svg?seed=JobPrep"}
+                    src={imgError || !avatarUrl ? defaultAvatar : `${avatarUrl}${avatarUrl.includes("?") ? "&" : "?"}v=${cacheKey}`}
                     alt="Avatar"
                     className="h-full w-full rounded-full object-cover"
+                    onError={() => setImgError(true)}
                 />
             </button>
 

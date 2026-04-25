@@ -31,6 +31,13 @@ export const profileApi = {
     getProfile: () => api.get('/profile'),
     updateProfile: (data) => api.put('/profile', data),
     changePassword: (data) => api.post('/profile/change-password', data),
+    uploadFile: (file) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return api.post('/files/upload', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+    },
 };
 
 export default api;
