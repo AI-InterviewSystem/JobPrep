@@ -38,6 +38,8 @@ public class ProfileService {
                 .timezone(profile.getTimezone())
                 .emailVerified(user.getEmailVerified())
                 .role(user.getRole())
+                .dob(profile.getDob())
+                .bio(profile.getBio())
                 .build();
     }
 
@@ -50,6 +52,8 @@ public class ProfileService {
         if (request.getPhone() != null) profile.setPhone(request.getPhone());
         if (request.getAvatarUrl() != null) profile.setAvatarUrl(request.getAvatarUrl());
         if (request.getTimezone() != null) profile.setTimezone(request.getTimezone());
+        if (request.getDob() != null) profile.setDob(request.getDob());
+        if (request.getBio() != null) profile.setBio(request.getBio());
 
         profileRepository.save(profile);
 

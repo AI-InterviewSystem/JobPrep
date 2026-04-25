@@ -44,6 +44,11 @@ public class Profile {
     @Column(columnDefinition = "jsonb")
     private String preferences;
 
+    private java.time.LocalDate dob;
+
+    @Column(columnDefinition = "text")
+    private String bio;
+
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
