@@ -40,4 +40,17 @@ export const profileApi = {
     },
 };
 
+export const cvApi = {
+    upload: (file) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return api.post('/cvs/upload', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+    },
+    list: () => api.get('/cvs'),
+    delete: (id) => api.delete(`/cvs/${id}`),
+    setCurrent: (id) => api.put(`/cvs/${id}/set-current`),
+};
+
 export default api;

@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router-dom"
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { cvApi } from "../services/api"
 import logo from "../assets/images/jobprep-logo.png"
 
 const industries = ["Software Engineering", "Data Science", "Marketing", "Finance", "Product Management"]
@@ -48,41 +49,85 @@ export default function InterviewSetupPage() {
     const [selectedType, setSelectedType] = useState("Technical")
 
     // CV Upload State
+    const [cvs, setCvs] = useState([])
+    const [loadingCvs, setLoadingCvs] = useState(true)
     const [isScanning, setIsScanning] = useState(false)
     const [scanProgress, setScanProgress] = useState(0)
     const [cvName, setCvName] = useState("")
     const [isAutoSelected, setIsAutoSelected] = useState(false)
+    const [deleteConfirmId, setDeleteConfirmId] = useState(null)
     const fileInputRef = useRef(null)
 
-    const handleFileUpload = (e) => {
-        const file = e.target.files[0]
-        if (file) {
-            startAIScan(file.name)
+    useEffect(() => {
+        fetchCvs()
+    }, [])
+
+    const fetchCvs = async () => {
+        try {
+            const res = await cvApi.list()
+            setCvs(res.data)
+        } catch (err) {
+            console.error("Failed to fetch CVs", err)
+        } finally {
+            setLoadingCvs(false)
         }
     }
 
-    const startAIScan = (fileName) => {
+    const handleFileUpload = async (e) => {
+        const file = e.target.files[0]
+        if (!file) return
+
         setIsScanning(true)
         setScanProgress(0)
-        setCvName(fileName)
+        setCvName(file.name)
         setIsAutoSelected(false)
 
-        // Simulate scanning progress
+        // Progress simulation
         const interval = setInterval(() => {
-            setScanProgress((prev) => {
-                if (prev >= 100) {
-                    clearInterval(interval)
-                    completeAIScan()
-                    return 100
-                }
-                return prev + 5
-            })
-        }, 100)
+            setScanProgress(p => p < 90 ? p + 5 : p)
+        }, 200)
+
+        try {
+            await cvApi.upload(file)
+            clearInterval(interval)
+            setScanProgress(100)
+            await fetchCvs()
+            completeAIScan()
+        } catch (err) {
+            console.error("Upload failed", err)
+            setIsScanning(false)
+            clearInterval(interval)
+        }
+    }
+
+    const handleDeleteCv = async (id, e) => {
+        e.stopPropagation()
+        setDeleteConfirmId(id)
+    }
+
+    const confirmDelete = async () => {
+        if (!deleteConfirmId) return
+        try {
+            await cvApi.delete(deleteConfirmId)
+            fetchCvs()
+        } catch (err) {
+            console.error("Delete failed", err)
+        } finally {
+            setDeleteConfirmId(null)
+        }
+    }
+
+    const handleSelectCv = async (id) => {
+        try {
+            await cvApi.setCurrent(id)
+            fetchCvs()
+        } catch (err) {
+            console.error("Selection failed", err)
+        }
     }
 
     const completeAIScan = () => {
         setTimeout(() => {
-            // Mock AI logic: randomly select professional settings
             const randomIndustry = industries[Math.floor(Math.random() * industries.length)]
             const randomLevel = experienceLevels[Math.floor(Math.random() * experienceLevels.length)].label
             const randomType = interviewTypes[Math.floor(Math.random() * interviewTypes.length)].label
@@ -98,23 +143,6 @@ export default function InterviewSetupPage() {
 
     return (
         <div className="min-h-screen bg-gray-50 font-display flex flex-col">
-            {/* Navbar */}
-            <header className="border-b border-gray-100 bg-white">
-                <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-4">
-                    <Link to="/" className="flex items-center gap-2">
-                        <img src={logo} alt="JobPrep" className="h-8" />
-                        <span className="font-bold text-gray-900">JobPrep</span>
-                    </Link>
-                    <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-600">
-                        <Link to="/dashboard" className="hover:text-primary transition-colors">Dashboard</Link>
-                        <a href="#" className="hover:text-primary transition-colors">Resources</a>
-                        <a href="#" className="hover:text-primary transition-colors">History</a>
-                    </nav>
-                    <div className="w-9 h-9 rounded-full bg-orange-200 flex items-center justify-center">
-                        <span className="text-orange-700 font-bold text-sm">A</span>
-                    </div>
-                </div>
-            </header>
 
             <main className="flex-1 max-w-3xl mx-auto w-full px-6 py-12">
                 <div className="mb-10 animate-entry">
@@ -142,15 +170,17 @@ export default function InterviewSetupPage() {
                     {/* CV Upload Section */}
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 overflow-hidden relative">
                         <div className="flex items-center gap-2 mb-5">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            <h2 className="font-bold text-gray-900 text-lg">Upload Resume (CV)</h2>
+                            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                            </div>
+                            <h2 className="font-bold text-gray-900 text-lg">Upload Resume</h2>
                         </div>
 
                         <div
                             onClick={() => fileInputRef.current?.click()}
-                            className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center gap-3 cursor-pointer transition-all ${isScanning ? "border-primary bg-primary/5" : "border-gray-200 hover:border-primary/50 hover:bg-gray-50"
+                            className={`border-2 border-dashed rounded-xl p-10 flex flex-col items-center justify-center gap-4 cursor-pointer transition-all ${isScanning ? "border-primary bg-primary/5" : "border-gray-200 hover:border-primary/50 hover:bg-gray-50"
                                 }`}
                         >
                             <input
@@ -189,22 +219,103 @@ export default function InterviewSetupPage() {
                                         initial={{ opacity: 0, y: 10 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         exit={{ opacity: 0, y: -10 }}
-                                        className="flex flex-col items-center gap-2"
+                                        className="flex flex-col items-center gap-3"
                                     >
-                                        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                        <div className="w-14 h-14 rounded-full bg-primary/5 flex items-center justify-center text-primary/60">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                                             </svg>
                                         </div>
-                                        <div>
-                                            <p className="text-sm font-bold text-gray-900">
-                                                {cvName ? cvName : "Click or drag your CV here"}
+                                        <div className="text-center">
+                                            <p className="text-base font-bold text-gray-900">
+                                                {cvName ? cvName : "Drag and drop your file here"}
                                             </p>
-                                            <p className="text-xs text-gray-400 mt-1">AI will automatically configure your session</p>
+                                            <p className="text-sm text-gray-400 mt-1">or click to browse</p>
+                                            <p className="text-[11px] text-gray-400 mt-4 font-medium uppercase tracking-wider">Supported formats: PDF, DOC, DOCX (Max size: 10MB)</p>
                                         </div>
                                     </motion.div>
                                 )}
                             </AnimatePresence>
+                        </div>
+                    </div>
+
+                    {/* My Resumes Section */}
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                        <div className="flex items-center justify-between mb-5">
+                            <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-500">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                                    </svg>
+                                </div>
+                                <h2 className="font-bold text-gray-900 text-lg">My Resume</h2>
+                            </div>
+                            {cvs.length > 0 && (
+                                <span className="bg-green-50 text-green-600 px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider border border-green-100">
+                                    Active
+                                </span>
+                            )}
+                        </div>
+
+                        <div className="space-y-3">
+                            {loadingCvs ? (
+                                <div className="text-center py-4 text-gray-400 text-sm italic">Loading your resumes...</div>
+                            ) : cvs.length === 0 ? (
+                                <div className="text-center py-8 border-2 border-dashed border-gray-50 rounded-xl text-gray-400 text-sm italic">
+                                    No resumes uploaded yet.
+                                </div>
+                            ) : (
+                                cvs.map(cv => (
+                                    <div 
+                                        key={cv.id}
+                                        onClick={() => handleSelectCv(cv.id)}
+                                        className={`group relative flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer ${
+                                            cv.isCurrent 
+                                            ? "border-blue-600 bg-blue-50/30" 
+                                            : "border-gray-50 hover:border-blue-200"
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${
+                                                cv.isCurrent ? "bg-blue-600 text-white shadow-lg shadow-blue-200" : "bg-blue-50 text-blue-600"
+                                            }`}>
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                                </svg>
+                                            </div>
+                                            <div>
+                                                <p className="text-base font-bold text-gray-900 line-clamp-1">{cv.fileName}</p>
+                                                <p className="text-xs text-gray-400 font-medium font-sans">Uploaded: {new Date(cv.createdAt).toLocaleDateString()}</p>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="flex items-center gap-2">
+                                            <a 
+                                                href={cv.storagePath} 
+                                                target="_blank" 
+                                                rel="noopener noreferrer"
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-gray-100 text-gray-400 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm"
+                                                title="View CV"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                </svg>
+                                            </a>
+                                            <button 
+                                                onClick={(e) => handleDeleteCv(cv.id, e)}
+                                                className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-gray-100 text-gray-400 hover:text-red-500 hover:border-red-200 transition-all shadow-sm"
+                                                title="Delete CV"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
                         </div>
                     </div>
                     {/* Industry Selection */}
@@ -372,6 +483,53 @@ export default function InterviewSetupPage() {
                     </div>
                 </div>
             </footer>
+
+            {/* Custom Delete Confirmation Modal */}
+            <AnimatePresence>
+                {deleteConfirmId && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setDeleteConfirmId(null)}
+                            className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm"
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                            className="relative bg-white rounded-3xl shadow-2xl max-w-sm w-full p-8 overflow-hidden"
+                        >
+                            <div className="flex flex-col items-center text-center">
+                                <div className="w-16 h-16 rounded-2xl bg-red-50 text-red-500 flex items-center justify-center mb-6">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </div>
+                                <h3 className="text-xl font-bold text-gray-900 mb-2">Delete Resume?</h3>
+                                <p className="text-gray-500 text-sm mb-8">
+                                    Are you sure you want to remove this resume? This action cannot be undone.
+                                </p>
+                                <div className="flex gap-3 w-full">
+                                    <button
+                                        onClick={() => setDeleteConfirmId(null)}
+                                        className="flex-1 py-3 px-4 rounded-xl border border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={confirmDelete}
+                                        className="flex-1 py-3 px-4 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 transition-colors shadow-lg shadow-red-200"
+                                    >
+                                        Delete
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </div>
     )
 }

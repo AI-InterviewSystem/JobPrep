@@ -59,32 +59,19 @@ export default function InterviewResultPage() {
 
     return (
         <div className="min-h-screen bg-gray-50 font-display flex flex-col">
-            {/* Navbar */}
-            <header className="border-b border-gray-100 bg-white">
-                <div className="max-w-6xl mx-auto flex items-center justify-between px-6 py-4">
-                    <Link to="/" className="flex items-center gap-2">
-                        <img src={logo} alt="JobPrep" className="h-8" />
-                        <span className="font-bold text-primary">JobPrep</span>
-                    </Link>
-                    <div className="flex items-center gap-4">
-                        <button className="flex items-center gap-2 bg-primary text-white px-5 py-2 rounded-xl text-sm font-semibold hover:bg-primary-dark transition-all">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                            </svg>
-                            Download Report
-                        </button>
-                        <div className="w-9 h-9 rounded-full bg-orange-200 flex items-center justify-center">
-                            <span className="text-orange-700 font-bold text-sm">A</span>
-                        </div>
-                    </div>
-                </div>
-            </header>
-
             <main className="max-w-6xl mx-auto w-full px-6 py-10 flex-1">
                 {/* Page Title */}
-                <div className="mb-8 animate-entry">
-                    <h1 className="text-4xl font-extrabold text-gray-900 mb-1">Interview Analysis</h1>
-                    <p className="text-gray-500">Detailed feedback for your Senior Product Designer role simulation.</p>
+                <div className="mb-8 animate-entry flex flex-col md:flex-row md:items-end justify-between gap-4">
+                    <div>
+                        <h1 className="text-4xl font-extrabold text-gray-900 mb-1">Interview Analysis</h1>
+                        <p className="text-gray-500">Detailed feedback for your Senior Product Designer role simulation.</p>
+                    </div>
+                    <button className="flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-primary-dark transition-all shadow-lg shadow-primary/20">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Download Report
+                    </button>
                 </div>
 
                 {/* Top Row */}
