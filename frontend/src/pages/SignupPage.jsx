@@ -62,16 +62,6 @@ export default function SignupPage() {
 
     return (
         <div className="min-h-screen bg-gray-50 font-display">
-            <header className="border-b border-gray-100 bg-white px-6 py-4">
-                <div className="max-w-7xl mx-auto flex items-center justify-between">
-                    <Link to="/" className="flex items-center gap-2">
-                        <img src={logo} alt="JobPrep" className="h-8" />
-                        <span className="font-bold text-gray-900">JobPrep</span>
-                    </Link>
-                    <div />
-                </div>
-            </header>
-
             <main className="flex flex-col items-center justify-center py-16 px-6">
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}

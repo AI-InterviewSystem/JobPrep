@@ -23,5 +23,6 @@ public class AuthResponse {
         private UUID id;
         private String email;
         private Boolean emailVerified;
+        private String role;
     }
 }

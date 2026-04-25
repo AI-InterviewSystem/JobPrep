@@ -7,7 +7,6 @@ import com.aiinterview.backend.entity.User;
 import com.aiinterview.backend.entity.VerificationOtp;
 import com.aiinterview.backend.exception.AppException;
 import com.aiinterview.backend.repository.PasswordResetTokenRepository;
-import com.aiinterview.backend.repository.ProfileRepository;
 import com.aiinterview.backend.repository.UserRepository;
 import com.aiinterview.backend.repository.VerificationOtpRepository;
 import lombok.RequiredArgsConstructor;
@@ -125,6 +124,7 @@ public class AuthService {
                         .id(savedUser.getId())
                         .email(savedUser.getEmail())
                         .emailVerified(savedUser.getEmailVerified())
+                        .role(savedUser.getRole())
                         .build())
                 .build();
     }
@@ -155,6 +155,7 @@ public class AuthService {
                         .id(user.getId())
                         .email(user.getEmail())
                         .emailVerified(user.getEmailVerified())
+                        .role(user.getRole())
                         .build())
                 .build();
     }
@@ -182,6 +183,7 @@ public class AuthService {
                         .id(user.getId())
                         .email(user.getEmail())
                         .emailVerified(user.getEmailVerified())
+                        .role(user.getRole())
                         .build())
                 .build();
     }

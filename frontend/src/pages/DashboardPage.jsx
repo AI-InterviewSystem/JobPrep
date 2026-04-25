@@ -1,39 +1,12 @@
-import { Link } from "react-router-dom"
 import { motion } from "framer-motion"
+import { Link } from "react-router-dom"
 import logo from "../assets/images/jobprep-logo.png"
-import AvatarMenu from "../components/layout/AvatarMenu"
 
 export default function DashboardPage() {
-    const token = localStorage.getItem("token")
-
     return (
         <div className="bg-[#f8fafc] font-display text-slate-900 min-h-screen">
             <div className="relative flex h-auto min-h-screen w-full flex-col group/design-root overflow-x-hidden">
-                <div className="layout-container flex h-full grow flex-col">
-                    {/* TopNavBar */}
-                    <header className="flex items-center justify-between border-b border-primary/10 bg-white px-6 lg:px-8 h-20 shrink-0 sticky top-0 z-50">
-                        <div className="max-w-7xl mx-auto w-full flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                                <Link to={token ? "/dashboard" : "/"} className="flex items-center gap-2">
-                                    <img src={logo} alt="JobPrep" className="h-8 w-auto" />
-                                    <span className="text-xl font-bold text-primary">JobPrep</span>
-                                </Link>
-                            </div>
-
-                            <div className="hidden md:flex items-center gap-8">
-                                <Link to="/dashboard" className="text-sm font-bold text-primary">Dashboard</Link>
-                                <Link to="/practice" className="text-sm font-medium text-[#0e141b] hover:text-primary transition-all">Practice</Link>
-                                <Link to="/reports" className="text-sm font-medium text-[#0e141b] hover:text-primary transition-all">Reports</Link>
-                                <Link to="/pricing" className="text-sm font-medium text-[#0e141b] hover:text-primary transition-all">Pricing</Link>
-                            </div>
-
-                            <div className="flex items-center gap-4">
-                                <AvatarMenu />
-                            </div>
-                        </div>
-                    </header>
-
-                    <main className="flex-1 pb-12">
+                <main className="flex-1 pb-12">
                         <div className="max-w-7xl mx-auto px-6 lg:px-8 py-8 space-y-8">
                             {/* Welcome Banner */}
                             <motion.div
@@ -236,7 +209,6 @@ export default function DashboardPage() {
                     </footer>
                 </div>
             </div>
-        </div>
     )
 }
 

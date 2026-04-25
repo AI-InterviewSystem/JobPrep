@@ -2,7 +2,6 @@ package com.aiinterview.backend.service;
 
 import com.aiinterview.backend.entity.Profile;
 import com.aiinterview.backend.entity.User;
-import com.aiinterview.backend.repository.ProfileRepository;
 import com.aiinterview.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,10 +14,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
+import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class CustomOAuth2UserService extends DefaultOAuth2UserService {
+public class CustomOAuth2UserService extends DefaultOAuth2UserService 
+        implements OAuth2UserService<OAuth2UserRequest, OAuth2User> {
 
     private final UserRepository userRepository;
 
@@ -39,8 +41,12 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
             if (user.getGoogleId() == null) {
                 log.info("Linking existing user {} with Google ID: {}", email, googleId);
                 user.setGoogleId(googleId);
-                userRepository.saveAndFlush(user);
             }
+            // Update avatar if missing
+            if (user.getProfile() != null && (user.getProfile().getAvatarUrl() == null || user.getProfile().getAvatarUrl().isEmpty())) {
+                user.getProfile().setAvatarUrl(picture);
+            }
+            userRepository.saveAndFlush(user);
         } else {
             log.info("Creating new Google user: {}", email);
             user = User.builder()
@@ -60,6 +66,6 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
             userRepository.save(user);
         }
 
-        return oAuth2User; // We can wrap this in a custom OAuth2User if needed
+        return oAuth2User;
     }
 }

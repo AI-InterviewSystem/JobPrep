@@ -3,8 +3,11 @@ import logo from "../../assets/images/jobprep-logo.png"
 import AvatarMenu from "./AvatarMenu"
 
 export default function Navbar() {
+    const user = JSON.parse(localStorage.getItem("user") || "{}")
+    const isAdmin = user.role === "ADMIN"
+
     return (
-        <header className="w-full border-b bg-white sticky top-0 z-50">
+        <header className="w-full border-b border-primary/10 bg-white sticky top-0 z-50">
             <div className="max-w-7xl mx-auto flex items-center px-6 py-4">
                 
                 {/* Logo - Fixed width on the left */}
@@ -14,7 +17,7 @@ export default function Navbar() {
                         className="flex items-center gap-3"
                     >
                         <img src={logo} alt="JobPrep Logo" className="h-8" />
-                        <span className="font-bold text-xl text-blue-600">
+                        <span className="font-bold text-xl text-primary">
                             JobPrep
                         </span>
                     </Link>
@@ -22,9 +25,15 @@ export default function Navbar() {
 
                 {/* Navigation - Centered */}
                 <nav className="hidden md:flex flex-1 justify-center items-center gap-10 text-sm font-semibold text-gray-600">
-                    <Link to="/#how-it-works" className="hover:text-blue-600 transition-colors">How It Works</Link>
-                    <Link to="/#features" className="hover:text-blue-600 transition-colors">Features</Link>
-                    <Link to="/pricing" className="hover:text-blue-600 transition-colors">Pricing</Link>
+                    <Link to="/dashboard" className="text-primary">Dashboard</Link>
+                    <Link to="/practice" className="hover:text-primary transition-colors">Practice</Link>
+                    <Link to="/pricing" className="hover:text-primary transition-colors">Pricing</Link>
+                    {isAdmin && (
+                        <Link to="/admin" className="text-red-500 hover:text-red-600 transition-colors flex items-center gap-1">
+                            <span className="material-symbols-outlined text-sm">admin_panel_settings</span>
+                            Admin
+                        </Link>
+                    )}
                 </nav>
 
                 {/* Right actions - Fixed width on the right */}

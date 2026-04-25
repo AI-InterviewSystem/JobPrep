@@ -1,6 +1,6 @@
 import { Routes, Route, useLocation, Navigate } from "react-router-dom"
-import { AnimatePresence } from "framer-motion"
 import AnimatedPage from "../components/AnimatedPage"
+import Navbar from "../components/layout/Navbar"
 
 import LandingPage from "../pages/LandingPage"
 import SignupPage from "../pages/SignupPage"
@@ -15,6 +15,7 @@ import InterviewSetupPage from "../pages/InterviewSetupPage"
 import LiveInterviewPage from "../pages/LiveInterviewPage"
 import InterviewResultPage from "../pages/InterviewResultPage"
 import OtpPage from "../pages/OtpPage"
+import AdminDashboard from "../pages/AdminDashboard"
 
 const ProtectedRoute = ({ children }) => {
     const token = localStorage.getItem("token")
@@ -22,56 +23,71 @@ const ProtectedRoute = ({ children }) => {
     return children
 }
 
+const AdminRoute = ({ children }) => {
+    const token = localStorage.getItem("token")
+    const user = JSON.parse(localStorage.getItem("user") || "{}")
+    
+    if (!token) return <Navigate to="/login" />
+    if (user.role !== "ADMIN") return <Navigate to="/dashboard" />
+    
+    return children
+}
+
 export default function AppRoutes() {
     const location = useLocation();
 
     return (
-        <AnimatePresence mode="wait">
-            <Routes location={location} key={location.pathname}>
+        <div className="flex flex-col min-h-screen">
+            <Navbar />
+            <div className="flex-1">
+                <Routes>
+                    <Route path="/" element={<LandingPage />} />
+                    <Route path="/signup" element={<SignupPage />} />
+                    <Route path="/login" element={<LoginPage />} />
+                    <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                    <Route path="/reset-password" element={<ResetPasswordPage />} />
+                    <Route path="/verify-otp" element={<OtpPage />} />
+                    <Route path="/auth/google-callback" element={<GoogleCallback />} />
 
-                <Route path="/" element={<AnimatedPage><LandingPage /></AnimatedPage>} />
+                    <Route path="/pricing" element={<PricingPage />} />
 
-                <Route path="/signup" element={<AnimatedPage><SignupPage /></AnimatedPage>} />
-                <Route path="/login" element={<AnimatedPage><LoginPage /></AnimatedPage>} />
-                <Route path="/forgot-password" element={<AnimatedPage><ForgotPasswordPage /></AnimatedPage>} />
-                <Route path="/reset-password" element={<AnimatedPage><ResetPasswordPage /></AnimatedPage>} />
-                <Route path="/verify-otp" element={<AnimatedPage><OtpPage /></AnimatedPage>} />
-                <Route path="/auth/google-callback" element={<GoogleCallback />} />
+                    <Route path="/dashboard" element={
+                        <ProtectedRoute>
+                            <DashboardPage />
+                        </ProtectedRoute>
+                    } />
 
-                <Route path="/pricing" element={<AnimatedPage><PricingPage /></AnimatedPage>} />
+                    <Route path="/admin" element={
+                        <AdminRoute>
+                            <AdminDashboard />
+                        </AdminRoute>
+                    } />
 
-                <Route path="/dashboard" element={
-                    <ProtectedRoute>
-                        <AnimatedPage><DashboardPage /></AnimatedPage>
-                    </ProtectedRoute>
-                } />
+                    <Route path="/profile" element={
+                        <ProtectedRoute>
+                            <ProfilePage />
+                        </ProtectedRoute>
+                    } />
 
-                <Route path="/profile" element={
-                    <ProtectedRoute>
-                        <AnimatedPage><ProfilePage /></AnimatedPage>
-                    </ProtectedRoute>
-                } />
+                    <Route path="/interview-setup" element={
+                        <ProtectedRoute>
+                            <InterviewSetupPage />
+                        </ProtectedRoute>
+                    } />
 
-                <Route path="/interview-setup" element={
-                    <ProtectedRoute>
-                        <AnimatedPage><InterviewSetupPage /></AnimatedPage>
-                    </ProtectedRoute>
-                } />
+                    <Route path="/live-interview" element={
+                        <ProtectedRoute>
+                            <LiveInterviewPage />
+                        </ProtectedRoute>
+                    } />
 
-                <Route path="/live-interview" element={
-                    <ProtectedRoute>
-                        <AnimatedPage><LiveInterviewPage /></AnimatedPage>
-                    </ProtectedRoute>
-                } />
-
-                <Route path="/interview-result" element={
-                    <ProtectedRoute>
-                        <AnimatedPage><InterviewResultPage /></AnimatedPage>
-                    </ProtectedRoute>
-                } />
-
-            </Routes>
-        </AnimatePresence>
+                    <Route path="/interview-result" element={
+                        <ProtectedRoute>
+                            <InterviewResultPage />
+                        </ProtectedRoute>
+                    } />
+                </Routes>
+            </div>
+        </div>
     )
-
 }

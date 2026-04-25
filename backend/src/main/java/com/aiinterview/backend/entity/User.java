@@ -61,6 +61,10 @@ public class User {
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private Profile profile;
 
+    @Builder.Default
+    @Column(name = "role", nullable = false)
+    private String role = "USER";
+
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
