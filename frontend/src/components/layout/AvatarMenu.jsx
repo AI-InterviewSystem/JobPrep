@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
+import { profileApi } from "../../services/api"
 
 function safeParseUser() {
     try {
@@ -25,7 +26,7 @@ function getAvatarUrl(user) {
 
 function normalizeAvatarUrl(url) {
     if (!url) return ""
-    if (url.startsWith("/")) {
+    if (typeof url === "string" && url.startsWith("/")) {
         const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/ai-interview"
         return `${baseUrl}${url}`
     }
@@ -51,6 +52,32 @@ export default function AvatarMenu() {
     }, [rawAvatarUrl])
 
     useEffect(() => {
+        const fetchUserData = async () => {
+            const token = localStorage.getItem("token")
+            if (!token) return
+
+            try {
+                const response = await profileApi.getProfile()
+                const userData = response.data
+                const raw = localStorage.getItem("user")
+                const current = raw ? JSON.parse(raw) : {}
+                
+                const updatedUser = {
+                    ...current,
+                    fullName: userData.fullName ?? current.fullName,
+                    avatarUrl: normalizeAvatarUrl(userData.avatarUrl) || current.avatarUrl,
+                    role: userData.role ?? current.role,
+                }
+                
+                localStorage.setItem("user", JSON.stringify(updatedUser))
+                setUser(updatedUser)
+            } catch (err) {
+                console.error("Failed to fetch user profile in AvatarMenu:", err)
+            }
+        }
+
+        fetchUserData()
+
         const handleStorage = (e) => {
             if (e.key && e.key !== "user") return
             setUser(safeParseUser())
