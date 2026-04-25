@@ -8,4 +8,6 @@ public class UpdateProfileRequest {
     private String phone;
     private String avatarUrl;
     private String timezone;
+    private java.time.LocalDate dob;
+    private String bio;
 }

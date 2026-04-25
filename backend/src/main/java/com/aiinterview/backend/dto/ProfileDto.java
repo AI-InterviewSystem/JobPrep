@@ -20,4 +20,6 @@ public class ProfileDto {
     private String timezone;
     private Boolean emailVerified;
     private String role;
+    private java.time.LocalDate dob;
+    private String bio;
 }

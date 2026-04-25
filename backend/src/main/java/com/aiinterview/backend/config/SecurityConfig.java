@@ -48,7 +48,6 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/auth/**").permitAll()
-                        .requestMatchers("/uploads/**").permitAll()
                         .requestMatchers("/files/upload").permitAll() // TEMPORARY for debugging
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
