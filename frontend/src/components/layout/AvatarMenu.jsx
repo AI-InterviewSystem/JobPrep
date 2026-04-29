@@ -114,6 +114,8 @@ export default function AvatarMenu() {
         navigate("/")
     }
 
+    const profileLink = user?.role === "ADMIN" ? "/admin/profile" : "/profile"
+
     return (
         <div ref={rootRef} className="relative">
             <button
@@ -137,7 +139,7 @@ export default function AvatarMenu() {
                     className="absolute right-0 mt-3 w-44 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-xl"
                 >
                     <Link
-                        to="/profile"
+                        to={profileLink}
                         role="menuitem"
                         onClick={() => setOpen(false)}
                         className="block px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"

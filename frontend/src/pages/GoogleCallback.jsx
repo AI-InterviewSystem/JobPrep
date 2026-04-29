@@ -17,13 +17,18 @@ export default function GoogleCallback() {
             localStorage.setItem("token", token)
             try {
                 const response = await profileApi.getProfile()
-                localStorage.setItem("user", JSON.stringify(response.data))
+                const user = response.data
+                localStorage.setItem("user", JSON.stringify(user))
                 window.dispatchEvent(new Event("jobprep:user-updated"))
+                
+                if (user?.role === "ADMIN") {
+                    navigate("/admin")
+                } else {
+                    navigate("/dashboard")
+                }
             } catch {
-                // ignore
+                navigate("/dashboard")
             }
-
-            navigate("/dashboard")
         }
 
         run()

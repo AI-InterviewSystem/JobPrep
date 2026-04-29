@@ -18,8 +18,13 @@ export default function LoginPage() {
         try {
             const response = await authApi.login({ email, password })
             localStorage.setItem("token", response.data.token)
-            localStorage.setItem("user", JSON.stringify(response.data.user))
-            navigate("/dashboard")
+            const user = response.data.user
+            localStorage.setItem("user", JSON.stringify(user))
+            if (user.role === "ADMIN") {
+                navigate("/admin")
+            } else {
+                navigate("/dashboard")
+            }
         } catch (err) {
             setError(err.response?.data?.message || "Invalid email or password")
         } finally {

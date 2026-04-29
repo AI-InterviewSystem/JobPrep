@@ -16,6 +16,7 @@ import LiveInterviewPage from "../pages/LiveInterviewPage"
 import InterviewResultPage from "../pages/InterviewResultPage"
 import OtpPage from "../pages/OtpPage"
 import AdminDashboard from "../pages/AdminDashboard"
+import AdminLayout from "../layouts/AdminLayout"
 
 const ProtectedRoute = ({ children }) => {
     const token = localStorage.getItem("token")
@@ -28,17 +29,18 @@ const AdminRoute = ({ children }) => {
     const user = JSON.parse(localStorage.getItem("user") || "{}")
     
     if (!token) return <Navigate to="/login" />
-    if (user.role !== "ADMIN") return <Navigate to="/dashboard" />
+    if (user?.role !== "ADMIN") return <Navigate to="/dashboard" />
     
     return children
 }
 
 export default function AppRoutes() {
     const location = useLocation();
+    const isAdminRoute = location.pathname.startsWith("/admin");
 
     return (
-        <div className="flex flex-col min-h-screen">
-            <Navbar />
+        <div className="flex flex-col min-h-screen bg-gray-50">
+            {!isAdminRoute && <Navbar />}
             <div className="flex-1">
                 <Routes>
                     <Route path="/" element={<LandingPage />} />
@@ -59,9 +61,14 @@ export default function AppRoutes() {
 
                     <Route path="/admin" element={
                         <AdminRoute>
-                            <AdminDashboard />
+                            <AdminLayout />
                         </AdminRoute>
-                    } />
+                    }>
+                        <Route index element={<Navigate to="dashboard" replace />} />
+                        <Route path="dashboard" element={<AdminDashboard />} />
+                        <Route path="profile" element={<ProfilePage />} />
+                    </Route>
+
 
                     <Route path="/profile" element={
                         <ProtectedRoute>
