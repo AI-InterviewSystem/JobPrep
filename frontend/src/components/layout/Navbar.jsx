@@ -13,7 +13,7 @@ export default function Navbar() {
                 {/* Logo - Fixed width on the left */}
                 <div className="w-48 flex-shrink-0">
                     <Link 
-                        to={localStorage.getItem("token") ? "/dashboard" : "/"} 
+                        to={localStorage.getItem("token") ? (isAdmin ? "/admin" : "/dashboard") : "/"} 
                         className="flex items-center gap-3"
                     >
                         <img src={logo} alt="JobPrep Logo" className="h-8" />
