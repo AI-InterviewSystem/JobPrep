@@ -1,14 +1,17 @@
-import { Link } from "react-router-dom"
+import { Link, useLocation } from "react-router-dom"
 import logo from "../../assets/images/jobprep-logo.png"
 import AvatarMenu from "./AvatarMenu"
 
 export default function Navbar() {
+    const location = useLocation()
     const user = JSON.parse(localStorage.getItem("user") || "{}")
     const isAdmin = user.role === "ADMIN"
 
+    const isActive = (path) => location.pathname === path;
+
     return (
         <header className="w-full border-b border-primary/10 bg-white sticky top-0 z-50">
-            <div className="max-w-7xl mx-auto flex items-center px-6 py-4">
+            <div className="max-w-7xl mx-auto flex items-center px-6 py-3">
                 
                 {/* Logo - Fixed width on the left */}
                 <div className="w-48 flex-shrink-0">
@@ -25,9 +28,9 @@ export default function Navbar() {
 
                 {/* Navigation - Centered */}
                 <nav className="hidden md:flex flex-1 justify-center items-center gap-10 text-sm font-semibold text-gray-600">
-                    <Link to="/dashboard" className="text-primary">Dashboard</Link>
-                    <Link to="/practice" className="hover:text-primary transition-colors">Practice</Link>
-                    <Link to="/pricing" className="hover:text-primary transition-colors">Pricing</Link>
+                    <Link to="/dashboard" className={`${isActive('/dashboard') ? 'text-primary' : 'hover:text-primary transition-colors'}`}>Dashboard</Link>
+                    <Link to="/practice" className={`${isActive('/practice') ? 'text-primary' : 'hover:text-primary transition-colors'}`}>Practice</Link>
+                    <Link to="/pricing" className={`${isActive('/pricing') ? 'text-primary' : 'hover:text-primary transition-colors'}`}>Pricing</Link>
                     {isAdmin && (
                         <Link to="/admin" className="text-red-500 hover:text-red-600 transition-colors flex items-center gap-1">
                             <span className="material-symbols-outlined text-sm">admin_panel_settings</span>
