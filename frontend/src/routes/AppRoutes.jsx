@@ -16,6 +16,7 @@ import LiveInterviewPage from "../pages/LiveInterviewPage"
 import InterviewResultPage from "../pages/InterviewResultPage"
 import OtpPage from "../pages/OtpPage"
 import AdminDashboard from "../pages/AdminDashboard"
+import AdminPricingPlansPage from "../pages/AdminPricingPlansPage"
 import AdminLayout from "../layouts/AdminLayout"
 
 const ProtectedRoute = ({ children }) => {
@@ -66,6 +67,7 @@ export default function AppRoutes() {
                     }>
                         <Route index element={<Navigate to="dashboard" replace />} />
                         <Route path="dashboard" element={<AdminDashboard />} />
+                        <Route path="pricing-plans" element={<AdminPricingPlansPage />} />
                         <Route path="profile" element={<ProfilePage />} />
                     </Route>
 

@@ -1,9 +1,10 @@
 import React from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { 
-    FiHome, FiFileText, FiGrid, FiShoppingCart, FiShield, 
+    FiHome, FiGrid, FiShoppingCart, FiShield, 
     FiBell, FiCalendar, FiMessageSquare, FiLogOut, FiSearch,
-    FiChevronDown
+    FiChevronDown,
+    FiUser
 } from 'react-icons/fi';
 import AvatarMenu from '../components/layout/AvatarMenu';
 
@@ -21,6 +22,7 @@ export default function AdminLayout() {
 
     const getPageTitle = () => {
         if (location.pathname.includes('/admin/profile')) return 'Admin Profile';
+        if (location.pathname.includes('/admin/pricing-plans')) return 'Pricing Plans';
         return 'Dashboard';
     };
 
@@ -41,22 +43,18 @@ export default function AdminLayout() {
                             <FiHome className="text-lg" />
                             Home
                         </Link>
-                         <a href="#" className="flex items-center gap-4 text-gray-500 px-4 py-3 rounded-2xl font-medium hover:bg-slate-100 hover:text-gray-900 transition-colors">
-                            <FiFileText className="text-lg" />
+                        <Link to="/admin/users" className={`flex items-center gap-4 px-4 py-3 rounded-2xl font-medium transition-transform ${location.pathname.includes('/admin/users') ? 'bg-primary text-white shadow-md shadow-primary/30 hover:scale-105' : 'text-gray-500 hover:bg-slate-100 hover:text-gray-900'}`}>
+                            <FiUser className="text-lg" />
                             Users
-                        </a>
+                        </Link>
 
+                        <Link to="/admin/pricing-plans" className={`flex items-center gap-4 px-4 py-3 rounded-2xl font-medium transition-transform ${location.pathname.includes('/admin/pricing-plans') ? 'bg-primary text-white shadow-md shadow-primary/30 hover:scale-105' : 'text-gray-500 hover:bg-slate-100 hover:text-gray-900'}`}>
+                            <FiShoppingCart className="text-lg" />
+                            Pricing Plan
+                        </Link>
                         <a href="#" className="flex items-center gap-4 text-gray-500 px-4 py-3 rounded-2xl font-medium hover:bg-slate-100 hover:text-gray-900 transition-colors">
                             <FiGrid className="text-lg" />
-                            Pricing Plan
-                        </a>
-                        <a href="#" className="flex items-center gap-4 text-gray-500 px-4 py-3 rounded-2xl font-medium hover:bg-slate-100 hover:text-gray-900 transition-colors">
-                            <FiShoppingCart className="text-lg" />
                             Ecommerce
-                        </a>
-                        <a href="#" className="flex items-center gap-4 text-gray-500 px-4 py-3 rounded-2xl font-medium hover:bg-slate-100 hover:text-gray-900 transition-colors">
-                            <FiBell className="text-lg" />
-                            Notification
                         </a>
                         <a href="#" className="flex items-center gap-4 text-gray-500 px-4 py-3 rounded-2xl font-medium hover:bg-slate-100 hover:text-gray-900 transition-colors">
                             <FiMessageSquare className="text-lg" />
