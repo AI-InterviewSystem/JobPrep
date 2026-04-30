@@ -1,52 +1,11 @@
 import { Link } from "react-router-dom"
 import { motion } from "framer-motion"
+import { useState, useEffect } from "react"
+import { publicPricingPlansApi } from "../services/api"
 import logo from "../assets/images/jobprep-logo.png"
 import AvatarMenu from "../components/layout/AvatarMenu"
 
-const plans = [
-    {
-        name: "Free Plan",
-        subtitle: "Best for exploring features",
-        price: "0",
-        btnLabel: "Get Started",
-        btnStyle: "border border-primary text-primary hover:bg-blue-50",
-        popular: false,
-        features: [
-            { text: "Basic Resume Builder", included: true },
-            { text: "2 Mock Interviews / mo", included: true },
-            { text: "Community Access", included: true },
-            { text: "AI Feedback", included: false },
-        ],
-    },
-    {
-        name: "Basic Plan",
-        subtitle: "Everything you need to succeed",
-        price: "19",
-        btnLabel: "Subscribe Now",
-        btnStyle: "bg-primary text-white hover:bg-primary-dark",
-        popular: true,
-        features: [
-            { text: "Advanced Resume Builder", included: true },
-            { text: "10 Mock Interviews / mo", included: true },
-            { text: "Priority Support", included: true },
-            { text: "Detailed AI Feedback", included: true },
-        ],
-    },
-    {
-        name: "Premium Plan",
-        subtitle: "For high-stakes roles",
-        price: "49",
-        btnLabel: "Go Pro",
-        btnStyle: "border border-primary text-primary hover:bg-blue-50",
-        popular: false,
-        features: [
-            { text: "Unlimited Mock Interviews", included: true },
-            { text: "1-on-1 Human Coaching", included: true },
-            { text: "Expert Resume Review", included: true },
-            { text: "Exclusive Masterclasses", included: true },
-        ],
-    },
-]
+
 
 const comparison = [
     { feature: "Resume Templates", free: "Basic", basic: "Advanced", premium: "All Premium", basicBadge: true, premiumBadge: true },
@@ -69,6 +28,55 @@ const XIcon = () => (
 
 export default function PricingPage() {
     const token = localStorage.getItem("token")
+    const [plans, setPlans] = useState([])
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        const fetchPlans = async () => {
+            try {
+                const response = await publicPricingPlansApi.getAll()
+                const mappedPlans = response.data.map((plan, index) => {
+                    let parsedFeatures = []
+                    try {
+                        parsedFeatures = typeof plan.features === 'string' ? JSON.parse(plan.features) : plan.features
+                    } catch (e) {
+                        console.error("Failed to parse features for plan:", plan.name)
+                    }
+
+                    const formattedFeatures = Array.isArray(parsedFeatures) 
+                        ? parsedFeatures.map(f => typeof f === 'string' ? { text: f, included: true } : f)
+                        : []
+
+                    return {
+                        id: plan.id,
+                        name: plan.name,
+                        subtitle: plan.description || "Everything you need to succeed",
+                        price: plan.priceMonthly,
+                        btnLabel: plan.priceMonthly === 0 ? "Get Started" : "Subscribe Now",
+                        btnStyle: plan.priceMonthly > 0 && index === 1 
+                            ? "bg-primary text-white hover:bg-primary-dark shadow-md shadow-primary/30" 
+                            : "border border-primary text-primary hover:bg-blue-50",
+                        popular: index === 1,
+                        features: formattedFeatures
+                    }
+                })
+                setPlans(mappedPlans)
+            } catch (error) {
+                console.error("Failed to fetch pricing plans:", error)
+            } finally {
+                setLoading(false)
+            }
+        }
+        fetchPlans()
+    }, [])
+
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            </div>
+        )
+    }
 
     return (
         <div className="min-h-screen bg-gray-50 font-display">
@@ -93,7 +101,7 @@ export default function PricingPage() {
                 >
                     {plans.map((plan, index) => (
                         <motion.div
-                            key={plan.name}
+                            key={plan.id}
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.5, delay: index * 0.1 }}
@@ -210,7 +218,7 @@ export default function PricingPage() {
                         ))}
                     </div>
                     <div className="border-t border-gray-100 pt-6 text-center text-xs text-gray-400">
-                        © 2024 JobPrep AI. All rights reserved.
+                        © 2026 JobPrep AI. All rights reserved.
                     </div>
                 </div>
             </footer>
