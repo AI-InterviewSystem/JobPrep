@@ -53,4 +53,15 @@ export const cvApi = {
     setCurrent: (id) => api.put(`/cvs/${id}/set-current`),
 };
 
+export const adminPricingPlansApi = {
+    getAll: () => api.get('/admin/pricing-plans'),
+    create: (data) => api.post('/admin/pricing-plans', data),
+    update: (id, data) => api.put(`/admin/pricing-plans/${id}`, data),
+    delete: (id) => api.delete(`/admin/pricing-plans/${id}`)
+};
+
+export const publicPricingPlansApi = {
+    getAll: () => api.get('/pricing-plans')
+};
+
 export default api;
