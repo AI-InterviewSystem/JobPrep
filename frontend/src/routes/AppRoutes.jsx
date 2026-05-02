@@ -1,6 +1,7 @@
 import { Routes, Route, useLocation, Navigate } from "react-router-dom"
 import AnimatedPage from "../components/AnimatedPage"
 import Navbar from "../components/layout/Navbar"
+import Footer from "../components/layout/Footer"
 
 import LandingPage from "../pages/LandingPage"
 import SignupPage from "../pages/SignupPage"
@@ -18,6 +19,7 @@ import OtpPage from "../pages/OtpPage"
 import AdminDashboard from "../pages/AdminDashboard"
 import AdminPricingPlansPage from "../pages/AdminPricingPlansPage"
 import AdminLayout from "../layouts/AdminLayout"
+import PaymentResultPage from "../pages/PaymentResultPage"
 
 const ProtectedRoute = ({ children }) => {
     const token = localStorage.getItem("token")
@@ -95,8 +97,12 @@ export default function AppRoutes() {
                             <InterviewResultPage />
                         </ProtectedRoute>
                     } />
+
+                    <Route path="/payment/success" element={<PaymentResultPage status="success" />} />
+                    <Route path="/payment/cancel" element={<PaymentResultPage status="cancel" />} />
                 </Routes>
             </div>
+            {!isAdminRoute && <Footer />}
         </div>
     )
 }

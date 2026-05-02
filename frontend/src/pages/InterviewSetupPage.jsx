@@ -473,16 +473,7 @@ export default function InterviewSetupPage() {
                 </div>
             </main>
 
-            <footer className="border-t border-gray-50 py-6 px-6">
-                <div className="max-w-3xl mx-auto flex justify-between items-center text-xs text-gray-400">
-                    <span>© 2024 JobPrep AI. All rights reserved.</span>
-                    <div className="flex gap-6">
-                        <a href="#" className="hover:text-primary transition-colors">Privacy Policy</a>
-                        <a href="#" className="hover:text-primary transition-colors">Help Center</a>
-                        <a href="#" className="hover:text-primary transition-colors">Feedback</a>
-                    </div>
-                </div>
-            </footer>
+
 
             {/* Custom Delete Confirmation Modal */}
             <AnimatePresence>

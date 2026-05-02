@@ -548,9 +548,7 @@ export default function ProfilePage() {
                 </AnimatePresence>
             </main>
 
-            <footer className="py-12 px-6 border-t border-slate-200 text-center text-slate-400 text-sm font-medium">
-                © 2024 JobPrep AI. Protected by bank-grade security.
-            </footer>
+
         </div>
     )
 }
