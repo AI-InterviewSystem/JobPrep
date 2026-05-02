@@ -194,19 +194,7 @@ export default function DashboardPage() {
                         </div>
                     </main>
 
-                    <footer className="bg-white border-t border-slate-200 py-10">
-                        <div className="max-w-7xl mx-auto px-6 lg:px-8 flex flex-wrap justify-between items-center gap-6">
-                            <div className="flex items-center gap-2">
-                                <img src={logo} alt="JobPrep" className="h-6 w-auto opacity-50" />
-                                <p className="text-slate-400 text-sm font-medium">© 2024 JobPrep AI. All rights reserved.</p>
-                            </div>
-                            <div className="flex gap-8">
-                                <a href="#" className="text-sm font-bold text-slate-400 hover:text-primary transition-colors">Terms</a>
-                                <a href="#" className="text-sm font-bold text-slate-400 hover:text-primary transition-colors">Privacy</a>
-                                <a href="#" className="text-sm font-bold text-slate-400 hover:text-primary transition-colors">Help Center</a>
-                            </div>
-                        </div>
-                    </footer>
+
                 </div>
             </div>
     )

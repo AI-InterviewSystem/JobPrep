@@ -64,4 +64,8 @@ export const publicPricingPlansApi = {
     getAll: () => api.get('/pricing-plans')
 };
 
+export const paymentApi = {
+    subscribe: (planId) => api.post('/payments/subscribe', { planId }),
+};
+
 export default api;

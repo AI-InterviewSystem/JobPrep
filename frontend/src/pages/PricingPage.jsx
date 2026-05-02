@@ -1,9 +1,10 @@
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import { motion } from "framer-motion"
 import { useState, useEffect } from "react"
-import { publicPricingPlansApi } from "../services/api"
+import { publicPricingPlansApi, paymentApi } from "../services/api"
 import logo from "../assets/images/jobprep-logo.png"
 import AvatarMenu from "../components/layout/AvatarMenu"
+import toast from "react-hot-toast"
 
 
 
@@ -27,9 +28,11 @@ const XIcon = () => (
 )
 
 export default function PricingPage() {
+    const navigate = useNavigate()
     const token = localStorage.getItem("token")
     const [plans, setPlans] = useState([])
     const [loading, setLoading] = useState(true)
+    const [subscribingId, setSubscribingId] = useState(null)
 
     useEffect(() => {
         const fetchPlans = async () => {
@@ -69,6 +72,32 @@ export default function PricingPage() {
         }
         fetchPlans()
     }, [])
+
+    const handleSubscribe = async (plan) => {
+        if (!token) {
+            toast.error("Please login to subscribe")
+            navigate("/login")
+            return
+        }
+
+        if (plan.price === 0) {
+            navigate("/dashboard")
+            return
+        }
+
+        try {
+            setSubscribingId(plan.id)
+            const response = await paymentApi.subscribe(plan.id)
+            if (response.data && response.data.checkoutUrl) {
+                window.location.href = response.data.checkoutUrl
+            }
+        } catch (error) {
+            console.error("Subscription failed:", error)
+            toast.error(error.response?.data?.message || "Failed to initiate payment")
+        } finally {
+            setSubscribingId(null)
+        }
+    }
 
     if (loading) {
         return (
@@ -119,12 +148,18 @@ export default function PricingPage() {
                                 <span className="text-4xl font-extrabold text-gray-900">${plan.price}</span>
                                 <span className="text-gray-400 text-sm mb-1">/month</span>
                             </div>
-                            <Link
-                                to="/signup"
-                                className={`block text-center w-full py-2.5 rounded-xl font-semibold text-sm transition-all mb-6 ${plan.btnStyle}`}
+                            <button
+                                onClick={() => handleSubscribe(plan)}
+                                disabled={subscribingId === plan.id}
+                                className={`block w-full py-2.5 rounded-xl font-semibold text-sm transition-all mb-6 ${plan.btnStyle} ${subscribingId === plan.id ? "opacity-50 cursor-not-allowed" : ""}`}
                             >
-                                {plan.btnLabel}
-                            </Link>
+                                {subscribingId === plan.id ? (
+                                    <span className="flex items-center justify-center gap-2">
+                                        <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                                        Processing...
+                                    </span>
+                                ) : plan.btnLabel}
+                            </button>
                             <ul className="space-y-3">
                                 {plan.features.map((f, i) => (
                                     <li key={i} className={`flex items-center gap-2 text-sm ${f.included ? "text-gray-700" : "text-gray-300 line-through"}`}>
@@ -193,35 +228,6 @@ export default function PricingPage() {
                 </div>
             </main>
 
-            {/* Footer */}
-            <footer className="border-t border-gray-100 bg-white py-16 px-6 mt-8">
-                <div className="max-w-5xl mx-auto">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10">
-                        <div>
-                            <Link to="/" className="flex items-center gap-2 mb-4">
-                                <img src={logo} alt="JobPrep" className="h-6" />
-                                <span className="font-bold text-gray-900 text-sm">JobPrep</span>
-                            </Link>
-                            <p className="text-xs text-gray-400 leading-relaxed">Accelerating career success for the next generation of talent.</p>
-                        </div>
-                        {[
-                            { title: "Product", links: ["AI Interviewer", "Resume Builder", "Career Pathing"] },
-                            { title: "Resources", links: ["Interview Guide", "Blog", "Success Stories"] },
-                            { title: "Legal", links: ["Privacy Policy", "Terms of Service", "Cookies"] },
-                        ].map(({ title, links }) => (
-                            <div key={title}>
-                                <h4 className="font-semibold text-gray-900 text-sm mb-4">{title}</h4>
-                                <ul className="space-y-2">
-                                    {links.map(l => <li key={l}><a href="#" className="text-xs text-gray-400 hover:text-primary transition-colors">{l}</a></li>)}
-                                </ul>
-                            </div>
-                        ))}
-                    </div>
-                    <div className="border-t border-gray-100 pt-6 text-center text-xs text-gray-400">
-                        © 2026 JobPrep AI. All rights reserved.
-                    </div>
-                </div>
-            </footer>
         </div>
     )
 }

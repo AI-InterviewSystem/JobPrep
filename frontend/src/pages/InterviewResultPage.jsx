@@ -226,19 +226,7 @@ export default function InterviewResultPage() {
                 </div>
             </main>
 
-            <footer className="border-t border-gray-50 py-5 px-6 bg-white">
-                <div className="max-w-6xl mx-auto flex justify-between items-center text-xs text-gray-400">
-                    <div className="flex items-center gap-2">
-                        <img src={logo} alt="JobPrep" className="h-5" />
-                        <span className="text-gray-500 font-medium">JobPrep © 2024</span>
-                    </div>
-                    <div className="flex gap-6">
-                        <a href="#" className="hover:text-primary transition-colors">Privacy Policy</a>
-                        <a href="#" className="hover:text-primary transition-colors">Terms of Service</a>
-                        <a href="#" className="hover:text-primary transition-colors">Support</a>
-                    </div>
-                </div>
-            </footer>
+
         </div>
     )
 }

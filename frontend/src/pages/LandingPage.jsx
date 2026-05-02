@@ -270,60 +270,6 @@ export default function LandingPage() {
                 </div>
             </section>
 
-            <footer className="bg-white border-t border-slate-200 pt-16 pb-8">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 mb-16">
-                        <div className="col-span-2 lg:col-span-2">
-                            <div className="flex items-center gap-2 mb-6">
-                                <img src={logo} alt="JobPrep Logo" className="h-8 w-auto" />
-                                <span className="text-xl font-bold text-primary">JobPrep</span>
-                            </div>
-                            <p className="text-slate-700 mb-6">
-                                Empowering candidates with next-generation AI coaching to master the art of data-driven interviewing.
-                            </p>
-                            <div className="flex gap-4">
-                                {['facebook', 'twitter', 'linkedin'].map((social) => (
-                                    <a key={social} href="#" className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 hover:text-primary transition-colors">
-                                        <span className="material-symbols-outlined">share</span>
-                                    </a>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div>
-                            <h4 className="font-bold text-[#0f172a] mb-6">Product</h4>
-                            <ul className="space-y-4">
-                                <li><a href="#" className="text-slate-700 hover:text-primary">Features</a></li>
-                                <li><a href="#" className="text-slate-700 hover:text-primary">Pricing</a></li>
-                                <li><a href="#" className="text-slate-700 hover:text-primary">Testimonials</a></li>
-                            </ul>
-                        </div>
-                        <div>
-                            <h4 className="font-bold text-[#0f172a] mb-6">Company</h4>
-                            <ul className="space-y-4">
-                                <li><a href="#" className="text-slate-700 hover:text-primary">About Us</a></li>
-                                <li><a href="#" className="text-slate-700 hover:text-primary">Careers</a></li>
-                                <li><a href="#" className="text-slate-700 hover:text-primary">Contact</a></li>
-                            </ul>
-                        </div>
-                        <div>
-                            <h4 className="font-bold text-[#0f172a] mb-6">Legal</h4>
-                            <ul className="space-y-4">
-                                <li><a href="#" className="text-slate-700 hover:text-primary">Privacy Policy</a></li>
-                                <li><a href="#" className="text-slate-700 hover:text-primary">Terms of Service</a></li>
-                                <li><a href="#" className="text-slate-700 hover:text-primary">Cookie Policy</a></li>
-                            </ul>
-                        </div>
-                    </div>
-                    <div className="pt-8 border-t border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
-                        <p className="text-slate-600 text-sm">© 2024 JobPrep AI. All rights reserved.</p>
-                        <div className="flex gap-6 text-sm">
-                            <a href="#" className="text-slate-600 hover:text-primary">Privacy</a>
-                            <a href="#" className="text-slate-600 hover:text-primary">Terms</a>
-                        </div>
-                    </div>
-                </div>
-            </footer>
         </div>
     )
 }

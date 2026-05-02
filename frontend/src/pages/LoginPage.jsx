@@ -120,9 +120,7 @@ export default function LoginPage() {
                 </motion.div>
             </main>
 
-            <footer className="text-center py-6 text-sm text-gray-400">
-                © 2024 JobPrep Inc. All rights reserved.
-            </footer>
+
         </div>
     )
 }

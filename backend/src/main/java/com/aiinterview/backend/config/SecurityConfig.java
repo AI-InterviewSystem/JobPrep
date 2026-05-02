@@ -50,6 +50,7 @@ public class SecurityConfig {
                         .requestMatchers("/auth/**").permitAll()
                         .requestMatchers("/files/upload").permitAll()
                         .requestMatchers("/pricing-plans/**").permitAll()
+                        .requestMatchers("/payments/webhook").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )

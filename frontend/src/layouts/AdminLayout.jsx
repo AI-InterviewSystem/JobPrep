@@ -1,12 +1,13 @@
 import React from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { 
-    FiHome, FiGrid, FiShoppingCart, FiShield, 
+import {
+    FiHome, FiGrid, FiShoppingCart, FiShield,
     FiBell, FiCalendar, FiMessageSquare, FiLogOut, FiSearch,
     FiChevronDown,
     FiUser
 } from 'react-icons/fi';
 import AvatarMenu from '../components/layout/AvatarMenu';
+import logo from '../assets/images/jobprep-logo.png';
 
 export default function AdminLayout() {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -32,9 +33,7 @@ export default function AdminLayout() {
             <aside className="w-64 bg-white m-4 rounded-[2rem] shadow-sm flex flex-col justify-between py-8 px-6 fixed h-[calc(100vh-2rem)] z-10">
                 <div>
                     <Link to="/admin" className="flex items-center gap-3 mb-10 px-2 cursor-pointer">
-                        <div className="bg-gradient-to-br from-primary to-primary-dark text-white p-2 rounded-full shadow-md">
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                        </div>
+                        <img src={logo} alt="JobPrep Logo" className="h-8" />
                         <h1 className="text-2xl font-bold tracking-tight text-primary">JobPrep</h1>
                     </Link>
 
@@ -74,15 +73,15 @@ export default function AdminLayout() {
                 {/* Header */}
                 <header className="flex justify-between items-center mb-8 sticky top-0 bg-slate-50/80 backdrop-blur-sm z-10 py-2 -mx-2 px-2 rounded-2xl">
                     <h2 className="text-2xl font-bold text-gray-900">{getPageTitle()}</h2>
-                    
+
                     <div className="flex flex-1 max-w-md mx-8">
                         <div className="relative w-full">
                             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                                 <FiSearch className="text-gray-400" />
                             </div>
-                            <input 
-                                type="text" 
-                                placeholder="Search..." 
+                            <input
+                                type="text"
+                                placeholder="Search..."
                                 className="w-full bg-white border border-slate-200 rounded-full py-2 pl-12 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 shadow-sm"
                             />
                         </div>
