@@ -21,8 +21,14 @@ public class UserSubscription {
     public enum Status {
         PENDING,
         ACTIVE,
+        ACTIVE_NON_RENEWING,
         CANCELLED,
         EXPIRED
+    }
+
+    public enum BillingCycle {
+        MONTHLY,
+        YEARLY
     }
 
     @Id
@@ -46,6 +52,17 @@ public class UserSubscription {
 
     @Column(name = "current_period_end")
     private LocalDateTime currentPeriodEnd;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "billing_cycle", length = 20)
+    private BillingCycle billingCycle;
+
+    @Column(name = "remaining_interviews")
+    private Integer remainingInterviews;
+
+    @Builder.Default
+    @Column(name = "cancel_at_period_end")
+    private Boolean cancelAtPeriodEnd = false;
 
     @CreatedDate
     @Column(name = "created_at", updatable = false)

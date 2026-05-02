@@ -65,7 +65,11 @@ export const publicPricingPlansApi = {
 };
 
 export const paymentApi = {
-    subscribe: (planId) => api.post('/payments/subscribe', { planId }),
+    subscribe: (data) => api.post('/payments/subscribe', data),
+    getHistory: () => api.get('/payments/history'),
+    cancel: () => api.post('/payments/cancel'),
+    getCurrentSubscription: () => api.get('/payments/current'),
+    syncStatus: (orderCode) => api.get(`/payments/sync/${orderCode}`),
 };
 
 export default api;

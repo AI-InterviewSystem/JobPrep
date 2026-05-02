@@ -28,6 +28,12 @@ public class Payment {
         FAILED
     }
 
+    public enum Type {
+        NEW_SUBSCRIPTION,
+        UPGRADE,
+        RENEWAL
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
@@ -59,6 +65,10 @@ public class Payment {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)
     private Status status;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private Type type;
 
     @Column(name = "paid_at")
     private LocalDateTime paidAt;

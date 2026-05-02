@@ -5,4 +5,5 @@ import lombok.Data;
 @Data
 public class SubscriptionRequest {
     private Long planId;
+    private String cycle; // "MONTHLY" or "YEARLY"
 }
