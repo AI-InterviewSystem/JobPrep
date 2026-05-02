@@ -27,7 +27,7 @@ export default function Navbar() {
                 </div>
 
                 {/* Navigation - Centered */}
-                <nav className="hidden md:flex flex-1 justify-center items-center gap-10 text-sm font-semibold text-gray-600">
+                <nav className="hidden md:flex flex-1 justify-center items-center gap-10 text-m font-semibold text-gray-600">
                     <Link to="/dashboard" className={`${isActive('/dashboard') ? 'text-primary' : 'hover:text-primary transition-colors'}`}>Dashboard</Link>
                     <Link to="/practice" className={`${isActive('/practice') ? 'text-primary' : 'hover:text-primary transition-colors'}`}>Practice</Link>
                     <Link to="/pricing" className={`${isActive('/pricing') ? 'text-primary' : 'hover:text-primary transition-colors'}`}>Pricing</Link>
