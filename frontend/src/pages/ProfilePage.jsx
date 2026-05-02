@@ -15,7 +15,7 @@ const normalizeAvatarUrl = (url) => {
 export default function ProfilePage() {
     const [profile, setProfile] = useState(null)
     const [editMode, setEditMode] = useState(false)
-    const [activeTab, setActiveTab] = useState("profile") // "profile" or "payment"
+    const [activeTab, setActiveTab] = useState("profile") 
     const [formData, setFormData] = useState({
         fullName: "",
         phone: "",

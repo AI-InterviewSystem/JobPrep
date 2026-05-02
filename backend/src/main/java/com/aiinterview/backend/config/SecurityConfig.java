@@ -4,7 +4,9 @@ import com.aiinterview.backend.repository.UserRepository;
 import com.aiinterview.backend.service.CustomOAuth2UserService;
 import com.aiinterview.backend.service.JwtService;
 import com.aiinterview.backend.service.UserPrincipal;
+import com.aiinterview.backend.service.UserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -15,6 +17,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
@@ -25,8 +28,6 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
 import java.util.List;
-
-import org.springframework.beans.factory.annotation.Value;
 
 @Configuration
 @EnableWebSecurity
@@ -39,6 +40,7 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final JwtService jwtService;
     private final CustomOAuth2UserService customOAuth2UserService;
+    private final UserService userService;
     private final UserRepository userRepository;
 
     @Bean
@@ -65,7 +67,20 @@ public class SecurityConfig {
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .oauth2Login(oauth2 -> oauth2
-                        .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
+                        .userInfoEndpoint(userInfo -> userInfo
+                                .userService(customOAuth2UserService)
+                                .oidcUserService(oidcRequest -> {
+                                    org.springframework.security.oauth2.core.oidc.user.OidcUser oidcUser =
+                                            new OidcUserService().loadUser(oidcRequest);
+                                    userService.upsertGoogleUser(
+                                            oidcUser.getAttribute("email"),
+                                            oidcUser.getAttribute("sub"),
+                                            oidcUser.getAttribute("name"),
+                                            oidcUser.getAttribute("picture")
+                                    );
+                                    return oidcUser;
+                                })
+                        )
                         .successHandler(oauth2SuccessHandler())
                 );
 
@@ -75,15 +90,13 @@ public class SecurityConfig {
     @Bean
     public AuthenticationSuccessHandler oauth2SuccessHandler() {
         return (request, response, authentication) -> {
-            OAuth2User oAuth2User = (OAuth2User) authentication.getPrincipal();
-            String email = oAuth2User.getAttribute("email");
-            
+            OAuth2User principal = (OAuth2User) authentication.getPrincipal();
+            String email = principal.getAttribute("email");
+
             com.aiinterview.backend.entity.User user = userRepository.findByEmail(email)
-                    .orElseThrow(() -> new RuntimeException("User not found after OAuth2 login"));
-            
-            UserPrincipal principal = new UserPrincipal(user);
-            String token = jwtService.generateToken(principal);
-            
+                    .orElseThrow(() -> new RuntimeException("User not found: " + email));
+
+            String token = jwtService.generateToken(new UserPrincipal(user));
             response.sendRedirect(frontendUrl + "/auth/google-callback?token=" + token);
         };
     }
