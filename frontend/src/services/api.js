@@ -60,6 +60,10 @@ export const adminPricingPlansApi = {
     delete: (id) => api.delete(`/admin/pricing-plans/${id}`)
 };
 
+export const adminDashboardApi = {
+    getStats: () => api.get('/admin/dashboard/stats')
+};
+
 export const publicPricingPlansApi = {
     getAll: () => api.get('/pricing-plans')
 };

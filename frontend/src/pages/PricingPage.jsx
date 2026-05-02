@@ -2,7 +2,6 @@ import { Link, useNavigate } from "react-router-dom"
 import { motion } from "framer-motion"
 import { useState, useEffect } from "react"
 import { publicPricingPlansApi, paymentApi } from "../services/api"
-import logo from "../assets/images/jobprep-logo.png"
 import AvatarMenu from "../components/layout/AvatarMenu"
 import toast from "react-hot-toast"
 
@@ -33,7 +32,7 @@ export default function PricingPage() {
     const [plans, setPlans] = useState([])
     const [loading, setLoading] = useState(true)
     const [subscribingId, setSubscribingId] = useState(null)
-    const [billingCycle, setBillingCycle] = useState("MONTHLY") // "MONTHLY" or "YEARLY"
+    const [billingCycle, setBillingCycle] = useState("MONTHLY") 
 
     useEffect(() => {
         const fetchPlans = async () => {
@@ -140,7 +139,7 @@ export default function PricingPage() {
                             />
                         </button>
                         <span className={`text-sm font-bold ${billingCycle === "YEARLY" ? "text-slate-900" : "text-slate-400"}`}>
-                            Yearly <span className="text-[10px] text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-full ml-1">SAVE 20%</span>
+                            Yearly
                         </span>
                     </div>
                 </div>
