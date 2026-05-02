@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { profileApi } from "../services/api"
+import { profileApi, paymentApi } from "../services/api"
+import toast from "react-hot-toast"
 
 const normalizeAvatarUrl = (url) => {
     if (!url) return ""
@@ -31,9 +32,48 @@ export default function ProfilePage() {
     const [loading, setLoading] = useState(true)
     const [msg, setMsg] = useState({ text: "", type: "" })
 
+    // Payment related state
+    const [subscription, setSubscription] = useState(null)
+    const [transactions, setTransactions] = useState([])
+    const [loadingPayment, setLoadingPayment] = useState(false)
+    const [showCancelModal, setShowCancelModal] = useState(false)
+
     useEffect(() => {
         fetchProfile()
-    }, [])
+        if (activeTab === "payment") {
+            fetchPaymentData()
+        }
+    }, [activeTab])
+
+    const fetchPaymentData = async () => {
+        setLoadingPayment(true)
+        try {
+            const [subRes, transRes] = await Promise.all([
+                paymentApi.getCurrentSubscription(),
+                paymentApi.getHistory()
+            ])
+            setSubscription(subRes.data)
+            setTransactions(transRes.data)
+        } catch (err) {
+            console.error("Failed to load payment data", err)
+        } finally {
+            setLoadingPayment(false)
+        }
+    }
+
+    const handleCancelSubscription = async () => {
+        setLoadingPayment(true)
+        try {
+            await paymentApi.cancel()
+            toast.success("Subscription cancellation scheduled.")
+            setShowCancelModal(false)
+            fetchPaymentData()
+        } catch (err) {
+            toast.error(err.response?.data?.message || "Failed to cancel subscription")
+        } finally {
+            setLoadingPayment(false)
+        }
+    }
 
     const fetchProfile = async () => {
         try {
@@ -518,37 +558,203 @@ export default function ProfilePage() {
                             initial={{ opacity: 0, x: 20 }}
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: -20 }}
-                            className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/40 border border-slate-100 p-8 md:p-12"
+                            className="space-y-8"
                         >
-                            <div className="flex items-center gap-3 mb-10">
-                                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                                    <span className="material-symbols-outlined text-primary text-2xl">receipt_long</span>
+                            {/* Current Subscription Card */}
+                            <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/40 border border-slate-100 p-8 md:p-12">
+                                <div className="flex items-center justify-between mb-8">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                                            <span className="material-symbols-outlined text-primary text-2xl">card_membership</span>
+                                        </div>
+                                        <h2 className="text-2xl font-bold text-slate-800">Current Subscription</h2>
+                                    </div>
+                                    {subscription && subscription.status === "ACTIVE" && !subscription.cancelAtPeriodEnd && (
+                                        <button
+                                            onClick={() => setShowCancelModal(true)}
+                                            className="px-6 py-2.5 rounded-xl border border-rose-100 text-rose-500 font-bold text-sm hover:bg-rose-50 transition-all"
+                                        >
+                                            Cancel Subscription
+                                        </button>
+                                    )}
                                 </div>
-                                <h2 className="text-2xl font-bold text-slate-800">Transaction History</h2>
+
+                                {subscription ? (
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                        <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                                            <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">Active Plan</p>
+                                            <p className="text-xl font-bold text-primary">{subscription.planName}</p>
+                                        </div>
+                                        <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                                            <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">Status</p>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`h-2 w-2 rounded-full ${['ACTIVE', 'ACTIVE_NON_RENEWING'].includes(subscription.status) ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
+                                                <p className="text-xl font-bold text-slate-700">
+                                                    {subscription.cancelAtPeriodEnd ? "Cancelling soon" : subscription.status}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                                            <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">Next Billing Date</p>
+                                            <p className="text-xl font-bold text-slate-700">
+                                                {subscription.currentPeriodEnd ? (() => {
+                                                    const d = new Date(subscription.currentPeriodEnd);
+                                                    const day = String(d.getDate()).padStart(2, '0');
+                                                    const month = String(d.getMonth() + 1).padStart(2, '0');
+                                                    const year = d.getFullYear();
+                                                    return `${day}/${month}/${year}`;
+                                                })() : "N/A"}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="p-8 bg-slate-50 rounded-3xl text-center border border-dashed border-slate-200">
+                                        <p className="text-slate-500 font-medium">You don't have an active subscription.</p>
+                                        <button 
+                                            className="mt-4 text-primary font-bold hover:underline"
+                                            onClick={() => window.location.href = "/pricing"}
+                                        >
+                                            Upgrade Now
+                                        </button>
+                                    </div>
+                                )}
                             </div>
 
-                            {/* Empty State / Placeholder */}
-                            <div className="flex flex-col items-center justify-center py-20 text-center">
-                                <div className="w-24 h-24 rounded-full bg-slate-50 flex items-center justify-center mb-6">
-                                    <span className="material-symbols-outlined text-slate-200 text-5xl">payments</span>
+                            {/* Transaction History Card */}
+                            <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/40 border border-slate-100 p-8 md:p-12">
+                                <div className="flex items-center gap-3 mb-10">
+                                    <div className="w-10 h-10 rounded-xl bg-slate-900/5 flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-slate-800 text-2xl">receipt_long</span>
+                                    </div>
+                                    <h2 className="text-2xl font-bold text-slate-800">Transaction History</h2>
                                 </div>
-                                <h3 className="text-xl font-bold text-slate-800 mb-2">No Transactions Yet</h3>
-                                <p className="text-slate-500 max-w-sm font-medium">
-                                    Your billing history and subscription plans will appear here.
-                                </p>
-                                <button 
-                                    className="mt-8 bg-primary/10 text-primary px-8 py-3 rounded-2xl font-bold hover:bg-primary/20 transition-all text-sm"
-                                    onClick={() => window.location.href = "/pricing"}
-                                >
-                                    View Pricing Plans
-                                </button>
+
+                                {loadingPayment ? (
+                                    <div className="flex justify-center py-12">
+                                        <div className="h-8 w-8 border-3 border-primary border-t-transparent rounded-full animate-spin"></div>
+                                    </div>
+                                ) : transactions.length > 0 ? (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left border-separate border-spacing-y-3">
+                                            <thead>
+                                                <tr>
+                                                    <th className="px-6 pb-2 text-[11px] font-black text-slate-400 uppercase tracking-widest">Transaction ID</th>
+                                                    <th className="px-6 pb-2 text-[11px] font-black text-slate-400 uppercase tracking-widest">Plan</th>
+                                                    <th className="px-6 pb-2 text-[11px] font-black text-slate-400 uppercase tracking-widest">Date</th>
+                                                    <th className="px-6 pb-2 text-[11px] font-black text-slate-400 uppercase tracking-widest">Amount</th>
+                                                    <th className="px-6 pb-2 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {transactions.map((tx) => (
+                                                    <tr key={tx.id} className="group">
+                                                        <td className="px-6 py-4 bg-slate-50 first:rounded-l-2xl font-bold text-slate-700 text-sm group-hover:bg-slate-100 transition-colors">
+                                                            #{tx.id ? tx.id.slice(0, 8) : "N/A"}
+                                                        </td>
+                                                        <td className="px-6 py-4 bg-slate-50 font-bold text-slate-700 text-sm group-hover:bg-slate-100 transition-colors">
+                                                            {tx.planName}
+                                                        </td>
+                                                        <td className="px-6 py-4 bg-slate-50 font-bold text-slate-500 text-sm group-hover:bg-slate-100 transition-colors">
+                                                            {(() => {
+                                                                const d = new Date(tx.date);
+                                                                const day = String(d.getDate()).padStart(2, '0');
+                                                                const month = String(d.getMonth() + 1).padStart(2, '0');
+                                                                const year = d.getFullYear();
+                                                                return `${day}/${month}/${year}`;
+                                                            })()}
+                                                        </td>
+                                                        <td className="px-6 py-4 bg-slate-50 font-black text-slate-900 text-sm group-hover:bg-slate-100 transition-colors">
+                                                            {tx.amount.toLocaleString()} {tx.currency}
+                                                        </td>
+                                                        <td className="px-6 py-4 bg-slate-50 last:rounded-r-2xl text-center group-hover:bg-slate-100 transition-colors">
+                                                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                                                                tx.status === 'PAID' ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : 
+                                                                tx.status === 'PENDING' ? "bg-amber-50 text-amber-600 border border-amber-100" :
+                                                                "bg-rose-50 text-rose-600 border border-rose-100"
+                                                            }`}>
+                                                                {tx.status}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                                        <div className="w-20 h-20 rounded-full bg-slate-50 flex items-center justify-center mb-4">
+                                            <span className="material-symbols-outlined text-slate-200 text-4xl">payments</span>
+                                        </div>
+                                        <h3 className="text-lg font-bold text-slate-800">No Transactions</h3>
+                                        <p className="text-slate-500 text-sm font-medium">You haven't made any transactions yet.</p>
+                                    </div>
+                                )}
                             </div>
                         </motion.div>
                     )}
                 </AnimatePresence>
             </main>
 
+            {/* Cancel Subscription Modal */}
+            <AnimatePresence>
+                {showCancelModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setShowCancelModal(false)}
+                            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                            className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md p-8 md:p-10 relative overflow-hidden"
+                        >
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/5 rounded-full -mr-16 -mt-16 blur-2xl"></div>
+                            
+                            <div className="flex flex-col items-center text-center gap-6 relative">
+                                <div className="w-20 h-20 rounded-[2rem] bg-rose-50 flex items-center justify-center">
+                                    <span className="material-symbols-outlined text-rose-500 text-4xl animate-pulse">heart_broken</span>
+                                </div>
+                                
+                                <div className="space-y-2">
+                                    <h3 className="text-2xl font-black text-slate-900 tracking-tight">Wait, don't go!</h3>
+                                    <p className="text-slate-500 font-medium leading-relaxed">
+                                        Are you sure you want to cancel? You'll lose access to premium AI features 
+                                        after <span className="font-bold text-slate-700">
+                                            {subscription?.currentPeriodEnd ? (() => {
+                                                const d = new Date(subscription.currentPeriodEnd);
+                                                const day = String(d.getDate()).padStart(2, '0');
+                                                const month = String(d.getMonth() + 1).padStart(2, '0');
+                                                const year = d.getFullYear();
+                                                return `${day}/${month}/${year}`;
+                                            })() : "the current period"}
+                                        </span>.
+                                    </p>
+                                </div>
 
+                                <div className="grid grid-cols-1 w-full gap-3 mt-4">
+                                    <button
+                                        onClick={handleCancelSubscription}
+                                        disabled={loadingPayment}
+                                        className="w-full bg-rose-500 text-white py-4 rounded-2xl font-bold hover:bg-rose-600 hover:shadow-lg hover:shadow-rose-200 transition-all uppercase text-xs tracking-widest disabled:opacity-50"
+                                    >
+                                        {loadingPayment ? "Processing..." : "Yes, Cancel Subscription"}
+                                    </button>
+                                    <button
+                                        onClick={() => setShowCancelModal(false)}
+                                        className="w-full bg-slate-50 text-slate-500 py-4 rounded-2xl font-bold hover:bg-slate-100 transition-all uppercase text-xs tracking-widest"
+                                    >
+                                        Keep My Plan
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </div>
     )
 }

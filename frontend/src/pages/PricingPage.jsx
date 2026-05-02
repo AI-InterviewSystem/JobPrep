@@ -33,6 +33,7 @@ export default function PricingPage() {
     const [plans, setPlans] = useState([])
     const [loading, setLoading] = useState(true)
     const [subscribingId, setSubscribingId] = useState(null)
+    const [billingCycle, setBillingCycle] = useState("MONTHLY") // "MONTHLY" or "YEARLY"
 
     useEffect(() => {
         const fetchPlans = async () => {
@@ -54,9 +55,10 @@ export default function PricingPage() {
                         id: plan.id,
                         name: plan.name,
                         subtitle: plan.description || "Everything you need to succeed",
-                        price: plan.priceMonthly,
-                        btnLabel: plan.priceMonthly === 0 ? "Get Started" : "Subscribe Now",
-                        btnStyle: plan.priceMonthly > 0 && index === 1 
+                        priceMonthly: plan.priceMonthly,
+                        priceYearly: plan.priceYearly,
+                        btnLabel: (billingCycle === "MONTHLY" ? plan.priceMonthly : plan.priceYearly) === 0 ? "Get Started" : "Subscribe Now",
+                        btnStyle: (billingCycle === "MONTHLY" ? plan.priceMonthly : plan.priceYearly) > 0 && index === 1 
                             ? "bg-primary text-white hover:bg-primary-dark shadow-md shadow-primary/30" 
                             : "border border-primary text-primary hover:bg-blue-50",
                         popular: index === 1,
@@ -80,14 +82,19 @@ export default function PricingPage() {
             return
         }
 
-        if (plan.price === 0) {
+        const currentPrice = billingCycle === "MONTHLY" ? plan.priceMonthly : plan.priceYearly
+
+        if (currentPrice === 0) {
             navigate("/dashboard")
             return
         }
 
         try {
             setSubscribingId(plan.id)
-            const response = await paymentApi.subscribe(plan.id)
+            const response = await paymentApi.subscribe({ 
+                planId: plan.id, 
+                cycle: billingCycle 
+            })
             if (response.data && response.data.checkoutUrl) {
                 window.location.href = response.data.checkoutUrl
             }
@@ -116,9 +123,26 @@ export default function PricingPage() {
                         Pricing Plans
                     </span>
                     <h1 className="text-5xl font-extrabold text-gray-900 mb-4">Invest in Your Future Career</h1>
-                    <p className="text-gray-500 max-w-xl mx-auto">
+                    <p className="text-gray-500 max-w-xl mx-auto mb-10">
                         Choose the perfect plan to master your interviews, build a winning resume, and land your dream job with AI-powered coaching.
                     </p>
+
+                    {/* Billing Toggle */}
+                    <div className="flex items-center justify-center gap-4 mb-8">
+                        <span className={`text-sm font-bold ${billingCycle === "MONTHLY" ? "text-slate-900" : "text-slate-400"}`}>Monthly</span>
+                        <button 
+                            onClick={() => setBillingCycle(billingCycle === "MONTHLY" ? "YEARLY" : "MONTHLY")}
+                            className="relative w-14 h-7 bg-slate-200 rounded-full p-1 transition-colors hover:bg-slate-300"
+                        >
+                            <motion.div 
+                                animate={{ x: billingCycle === "MONTHLY" ? 0 : 28 }}
+                                className="w-5 h-5 bg-primary rounded-full shadow-sm"
+                            />
+                        </button>
+                        <span className={`text-sm font-bold ${billingCycle === "YEARLY" ? "text-slate-900" : "text-slate-400"}`}>
+                            Yearly <span className="text-[10px] text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-full ml-1">SAVE 20%</span>
+                        </span>
+                    </div>
                 </div>
 
                 {/* Pricing Cards */}
@@ -145,8 +169,12 @@ export default function PricingPage() {
                             <h3 className="font-bold text-gray-900 text-lg mb-1">{plan.name}</h3>
                             <p className="text-gray-400 text-sm mb-6">{plan.subtitle}</p>
                             <div className="flex items-end gap-1 mb-6">
-                                <span className="text-4xl font-extrabold text-gray-900">${plan.price}</span>
-                                <span className="text-gray-400 text-sm mb-1">/month</span>
+                                <span className="text-4xl font-extrabold text-gray-900">
+                                    ${billingCycle === "MONTHLY" ? plan.priceMonthly : plan.priceYearly}
+                                </span>
+                                <span className="text-gray-400 text-sm mb-1">
+                                    /{billingCycle === "MONTHLY" ? "month" : "year"}
+                                </span>
                             </div>
                             <button
                                 onClick={() => handleSubscribe(plan)}

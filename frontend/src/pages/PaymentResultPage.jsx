@@ -2,19 +2,24 @@ import { useEffect } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { motion } from "framer-motion"
 import toast from "react-hot-toast"
+import { paymentApi } from "../services/api"
 
 export default function PaymentResultPage({ status }) {
     const navigate = useNavigate()
     const [searchParams] = useSearchParams()
 
     useEffect(() => {
+        const orderCode = searchParams.get("orderCode")
+        if (orderCode) {
+            paymentApi.syncStatus(orderCode).catch(err => console.error("Sync failed", err))
+        }
+
         if (status === "success") {
             toast.success("Subscription activated successfully!")
-            // Optionally clear some local state or refetch user info
         } else {
             toast.error("Payment was cancelled or failed.")
         }
-    }, [status])
+    }, [status, searchParams])
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
