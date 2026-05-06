@@ -474,7 +474,7 @@ export default function ProfilePage() {
                                 <form onSubmit={handleChangePassword} className="grid grid-cols-1 lg:grid-cols-2 gap-12">
                                     <div className="space-y-6">
                                         <div className="space-y-2">
-                                            <label className="text-xs font-black text-slate-500 uppercase tracking-widest ml-1">Current Password</label>
+                                            <label className="text-s font-black text-slate-500 tracking-widest ml-1">Current Password</label>
                                             <input 
                                                 type="password" 
                                                 value={passwordData.oldPassword}
@@ -485,7 +485,7 @@ export default function ProfilePage() {
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <label className="text-xs font-black text-slate-500 uppercase tracking-widest ml-1">New Password</label>
+                                            <label className="text-s font-black text-slate-500 tracking-widest ml-1">New Password</label>
                                             <input 
                                                 type="password" 
                                                 value={passwordData.newPassword}
@@ -494,10 +494,10 @@ export default function ProfilePage() {
                                                 className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all font-bold"
                                                 placeholder="••••••••"
                                             />
-                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider ml-1">Minimum 8 characters with letters & numbers.</p>
+                                            <p className="text-[10px] text-slate-400 font-bold tracking-wider ml-1">Minimum 8 characters with letters & numbers</p>
                                         </div>
                                         <div className="space-y-2">
-                                            <label className="text-xs font-black text-slate-500 uppercase tracking-widest ml-1">Confirm New Password</label>
+                                            <label className="text-s font-black text-slate-500 tracking-widest ml-1">Confirm New Password</label>
                                             <input 
                                                 type="password" 
                                                 value={passwordData.confirmPassword}

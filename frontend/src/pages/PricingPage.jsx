@@ -89,21 +89,7 @@ export default function PricingPage() {
             return
         }
 
-        try {
-            setSubscribingId(plan.id)
-            const response = await paymentApi.subscribe({ 
-                planId: plan.id, 
-                cycle: billingCycle 
-            })
-            if (response.data && response.data.checkoutUrl) {
-                window.location.href = response.data.checkoutUrl
-            }
-        } catch (error) {
-            console.error("Subscription failed:", error)
-            toast.error(error.response?.data?.message || "Failed to initiate payment")
-        } finally {
-            setSubscribingId(null)
-        }
+        navigate(`/checkout?planId=${plan.id}&cycle=${billingCycle}`)
     }
 
     if (loading) {

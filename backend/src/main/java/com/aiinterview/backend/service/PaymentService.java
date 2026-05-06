@@ -3,10 +3,7 @@ package com.aiinterview.backend.service;
 import com.aiinterview.backend.dto.*;
 import com.aiinterview.backend.entity.*;
 import com.aiinterview.backend.exception.AppException;
-import com.aiinterview.backend.repository.PaymentRepository;
-import com.aiinterview.backend.repository.PricingPlanRepository;
-import com.aiinterview.backend.repository.UserRepository;
-import com.aiinterview.backend.repository.UserSubscriptionRepository;
+import com.aiinterview.backend.repository.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,6 +33,9 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final UserRepository userRepository;
     private final PricingPlanRepository pricingPlanRepository;
+    private final PromoCodeRepository promoCodeRepository;
+    private final PromoCodeUsageRepository promoCodeUsageRepository;
+    private final PromoCodeService promoCodeService;
     private final ObjectMapper objectMapper;
 
     @Value("${app.frontend.url}")
@@ -95,6 +95,21 @@ public class PaymentService {
             finalAmountUsd = (cycle == UserSubscription.BillingCycle.YEARLY) ? plan.getPriceYearly() : plan.getPriceMonthly();
         }
 
+        // Apply Promo Code if present
+        PromoCode promoCode = null;
+        if (subscriptionRequest.getPromoCode() != null && !subscriptionRequest.getPromoCode().isEmpty()) {
+            PromoCodeRequest promoRequest = new PromoCodeRequest();
+            promoRequest.setCode(subscriptionRequest.getPromoCode());
+            promoRequest.setPlanId(subscriptionRequest.getPlanId());
+            promoRequest.setCycle(cycleStr);
+            
+            PromoCodeResponse promoResponse = promoCodeService.validateAndCalculate(promoRequest, user);
+            if (promoResponse.isValid()) {
+                finalAmountUsd = promoResponse.getFinalAmount();
+                promoCode = promoCodeRepository.findByCodeIgnoreCase(subscriptionRequest.getPromoCode()).orElse(null);
+            }
+        }
+
         // 1. Create Pending Subscription
         UserSubscription subscription = UserSubscription.builder()
                 .user(user)
@@ -125,6 +140,7 @@ public class PaymentService {
                 .transactionId(String.valueOf(orderCode))
                 .status(Payment.Status.PENDING)
                 .type(paymentType)
+                .promoCode(promoCode)
                 .build();
         payment = paymentRepository.save(payment);
 
@@ -249,6 +265,23 @@ public class PaymentService {
         subscription.setCancelAtPeriodEnd(false);
 
         subscriptionRepository.save(subscription);
+
+        // 5. Handle Promo Code Usage
+        if (payment.getPromoCode() != null) {
+            PromoCode promo = payment.getPromoCode();
+            
+            // Record usage
+            PromoCodeUsage usage = PromoCodeUsage.builder()
+                    .promoCode(promo)
+                    .user(user)
+                    .payment(payment)
+                    .build();
+            promoCodeUsageRepository.save(usage);
+            
+            // Increment count
+            promo.setUsedCount(promo.getUsedCount() + 1);
+            promoCodeRepository.save(promo);
+        }
     }
 
     @Transactional(readOnly = true)

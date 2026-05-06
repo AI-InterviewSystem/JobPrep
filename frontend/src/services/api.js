@@ -73,9 +73,14 @@ export const publicPricingPlansApi = {
 export const paymentApi = {
     subscribe: (data) => api.post('/payments/subscribe', data),
     getHistory: () => api.get('/payments/history'),
+    getStatus: () => api.get('/payments/status'),
     cancel: () => api.post('/payments/cancel'),
+    sync: (orderCode) => api.get(`/payments/sync/${orderCode}`),
     getCurrentSubscription: () => api.get('/payments/current'),
-    syncStatus: (orderCode) => api.get(`/payments/sync/${orderCode}`),
+};
+
+export const promoApi = {
+    validate: (data) => api.post('/promo/validate', data),
 };
 
 export default api;
