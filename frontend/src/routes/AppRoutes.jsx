@@ -19,6 +19,7 @@ import InterviewResultPage from "../pages/InterviewResultPage"
 import OtpPage from "../pages/OtpPage"
 import AdminDashboard from "../pages/AdminDashboard"
 import AdminPricingPlansPage from "../pages/AdminPricingPlansPage"
+import CheckoutPage from "../pages/CheckoutPage"
 import AdminLayout from "../layouts/AdminLayout"
 import PaymentResultPage from "../pages/PaymentResultPage"
 
@@ -56,6 +57,14 @@ export default function AppRoutes() {
                     <Route path="/auth/google-callback" element={<GoogleCallback />} />
 
                     <Route path="/pricing" element={<PricingPage />} />
+                    <Route
+                        path="/checkout"
+                        element={
+                            <ProtectedRoute>
+                                <CheckoutPage />
+                            </ProtectedRoute>
+                        }
+                    />
 
                     <Route path="/dashboard" element={
                         <ProtectedRoute>

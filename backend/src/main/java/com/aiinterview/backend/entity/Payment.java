@@ -46,6 +46,10 @@ public class Payment {
     @JoinColumn(name = "subscription_id")
     private UserSubscription subscription;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "promo_code_id")
+    private PromoCode promoCode;
+
     @Column(precision = 10, scale = 2)
     private BigDecimal amount;
 
