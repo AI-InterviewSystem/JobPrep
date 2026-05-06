@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { profileApi } from "../../services/api"
+import { storage } from "../../services/storage"
 
 function safeParseUser() {
     try {
-        const raw = localStorage.getItem("user")
-        if (!raw) return null
-        return JSON.parse(raw)
+        return storage.getUser()
     } catch {
         return null
     }
@@ -53,24 +52,18 @@ export default function AvatarMenu() {
 
     useEffect(() => {
         const fetchUserData = async () => {
-            const token = localStorage.getItem("token")
+            const token = storage.getToken()
             if (!token) return
 
             try {
                 const response = await profileApi.getProfile()
                 const userData = response.data
-                const raw = localStorage.getItem("user")
-                const current = raw ? JSON.parse(raw) : {}
-                
-                const updatedUser = {
-                    ...current,
-                    fullName: userData.fullName ?? current.fullName,
-                    avatarUrl: normalizeAvatarUrl(userData.avatarUrl) || current.avatarUrl,
-                    role: userData.role ?? current.role,
-                }
-                
-                localStorage.setItem("user", JSON.stringify(updatedUser))
-                setUser(updatedUser)
+                storage.updateUser({
+                    fullName: userData.fullName,
+                    avatarUrl: normalizeAvatarUrl(userData.avatarUrl) || undefined,
+                    role: userData.role,
+                })
+                setUser(storage.getUser())
             } catch (err) {
                 console.error("Failed to fetch user profile in AvatarMenu:", err)
             }
@@ -107,8 +100,7 @@ export default function AvatarMenu() {
     }, [])
 
     const handleLogout = () => {
-        localStorage.removeItem("token")
-        localStorage.removeItem("user")
+        storage.clearAuth()
         setOpen(false)
         window.dispatchEvent(new Event("jobprep:user-updated"))
         navigate("/")

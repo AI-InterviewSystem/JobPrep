@@ -175,7 +175,8 @@ public class AuthService {
         userRepository.save(user);
 
         var userPrincipal = new UserPrincipal(user);
-        String token = jwtService.generateToken(userPrincipal);
+        boolean rememberMe = Boolean.TRUE.equals(request.getRememberMe());
+        String token = jwtService.generateToken(userPrincipal, rememberMe);
 
         return AuthResponse.builder()
                 .token(token)

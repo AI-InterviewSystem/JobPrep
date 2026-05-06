@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { profileApi, paymentApi } from "../services/api"
+import { storage } from "../services/storage"
 import toast from "react-hot-toast"
 
 const normalizeAvatarUrl = (url) => {
@@ -81,18 +82,11 @@ export default function ProfilePage() {
             setProfile(response.data)
 
             try {
-                const raw = localStorage.getItem("user")
-                const current = raw ? JSON.parse(raw) : {}
-                localStorage.setItem(
-                    "user",
-                    JSON.stringify({
-                        ...current,
-                        fullName: response.data.fullName ?? current.fullName,
-                        avatarUrl: normalizeAvatarUrl(response.data.avatarUrl) || current.avatarUrl,
-                        role: response.data.role ?? current.role,
-                    })
-                )
-                window.dispatchEvent(new Event("jobprep:user-updated"))
+                storage.updateUser({
+                    fullName: response.data.fullName,
+                    avatarUrl: normalizeAvatarUrl(response.data.avatarUrl) || undefined,
+                    role: response.data.role,
+                })
             } catch {
                 // ignore
             }
@@ -139,18 +133,11 @@ export default function ProfilePage() {
             setProfile(response.data)
 
             try {
-                const raw = localStorage.getItem("user")
-                const current = raw ? JSON.parse(raw) : {}
-                localStorage.setItem(
-                    "user",
-                    JSON.stringify({
-                        ...current,
-                        fullName: response.data.fullName ?? current.fullName,
-                        avatarUrl: normalizeAvatarUrl(response.data.avatarUrl) || current.avatarUrl,
-                        role: response.data.role ?? current.role,
-                    })
-                )
-                window.dispatchEvent(new Event("jobprep:user-updated"))
+                storage.updateUser({
+                    fullName: response.data.fullName,
+                    avatarUrl: normalizeAvatarUrl(response.data.avatarUrl) || undefined,
+                    role: response.data.role,
+                })
             } catch {
                 // ignore
             }

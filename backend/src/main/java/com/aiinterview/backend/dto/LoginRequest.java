@@ -12,4 +12,10 @@ public class LoginRequest {
 
     @NotBlank(message = "Password is required")
     private String password;
+
+    /**
+     * If true, generate a long-lived token (30 days).
+     * If false or null, generate a standard token (24 hours).
+     */
+    private Boolean rememberMe;
 }

@@ -2,6 +2,7 @@ import { Link, useNavigate } from "react-router-dom"
 import { motion } from "framer-motion"
 import { useState, useEffect } from "react"
 import { publicPricingPlansApi, paymentApi } from "../services/api"
+import { storage } from "../services/storage"
 import AvatarMenu from "../components/layout/AvatarMenu"
 import toast from "react-hot-toast"
 
@@ -28,7 +29,7 @@ const XIcon = () => (
 
 export default function PricingPage() {
     const navigate = useNavigate()
-    const token = localStorage.getItem("token")
+    const token = storage.getToken()
     const [plans, setPlans] = useState([])
     const [loading, setLoading] = useState(true)
     const [subscribingId, setSubscribingId] = useState(null)

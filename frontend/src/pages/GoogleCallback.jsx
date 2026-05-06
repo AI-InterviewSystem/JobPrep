@@ -1,6 +1,7 @@
 import { useEffect } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { profileApi } from "../services/api"
+import { storage } from "../services/storage"
 
 export default function GoogleCallback() {
     const [searchParams] = useSearchParams()
@@ -14,11 +15,14 @@ export default function GoogleCallback() {
                 return
             }
 
-            localStorage.setItem("token", token)
+            // Temporarily store token so the api interceptor can attach it
+            // to the upcoming getProfile request, then finalize with setAuth.
+            storage.setAuth(token, {}, true)
             try {
                 const response = await profileApi.getProfile()
                 const user = response.data
-                localStorage.setItem("user", JSON.stringify(user))
+                // Re-persist with full user object
+                storage.setAuth(token, user, true)
                 window.dispatchEvent(new Event("jobprep:user-updated"))
                 
                 if (user?.role === "ADMIN") {
