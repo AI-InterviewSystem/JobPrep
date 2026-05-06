@@ -2,11 +2,12 @@ import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { motion } from "framer-motion"
 import { authApi } from "../services/api"
-import logo from "../assets/images/jobprep-logo.png"
+import { storage } from "../services/storage"
 
 export default function LoginPage() {
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
+    const [rememberMe, setRememberMe] = useState(false)
     const [error, setError] = useState("")
     const [loading, setLoading] = useState(false)
     const navigate = useNavigate()
@@ -16,10 +17,11 @@ export default function LoginPage() {
         setError("")
         setLoading(true)
         try {
-            const response = await authApi.login({ email, password })
-            localStorage.setItem("token", response.data.token)
-            const user = response.data.user
-            localStorage.setItem("user", JSON.stringify(user))
+            const response = await authApi.login({ email, password, rememberMe })
+            const { token, user } = response.data
+
+            storage.setAuth(token, user, rememberMe)
+
             if (user.role === "ADMIN") {
                 navigate("/admin")
             } else {
@@ -48,7 +50,7 @@ export default function LoginPage() {
                 >
                     <h1 className="text-4xl font-extrabold text-gray-900 text-center mb-2">Welcome back</h1>
                     <p className="text-gray-500 text-center mb-8">
-                        Log in to continue your interview preparation.
+                        Log in to continue your interview preparation
                     </p>
 
                     <div className="flex gap-4 mb-6">
@@ -92,7 +94,7 @@ export default function LoginPage() {
                         <div>
                             <div className="flex items-center justify-between mb-2">
                                 <label className="block text-sm font-medium text-gray-700">Password</label>
-                                <Link to="/forgot-password" weights="medium" className="text-xs text-primary hover:underline font-medium">Forgot password?</Link>
+                                <Link to="/forgot-password" className="text-xs text-primary hover:underline font-medium">Forgot password?</Link>
                             </div>
                             <input
                                 type="password"
@@ -102,6 +104,23 @@ export default function LoginPage() {
                                 required
                                 className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
                             />
+                        </div>
+
+                        {/* Remember Me */}
+                        <div className="flex items-center gap-2.5">
+                            <input
+                                type="checkbox"
+                                id="remember-me"
+                                checked={rememberMe}
+                                onChange={(e) => setRememberMe(e.target.checked)}
+                                className="w-4 h-4 rounded border-gray-200 text-primary focus:ring-primary/20 transition-all cursor-pointer accent-primary"
+                            />
+                            <label
+                                htmlFor="remember-me"
+                                className="text-sm text-gray-600 select-none cursor-pointer font-medium"
+                            >
+                                Remember me
+                            </label>
                         </div>
 
                         <button
@@ -119,8 +138,6 @@ export default function LoginPage() {
                     </div>
                 </motion.div>
             </main>
-
-
         </div>
     )
 }

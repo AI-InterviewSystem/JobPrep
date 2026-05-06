@@ -8,15 +8,15 @@ import {
 } from 'react-icons/fi';
 import AvatarMenu from '../components/layout/AvatarMenu';
 import logo from '../assets/images/jobprep-logo.png';
+import { storage } from '../services/storage';
 
 export default function AdminLayout() {
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const user = storage.getUser() || {};
     const location = useLocation();
     const navigate = useNavigate();
 
     const handleLogout = () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        storage.clearAuth();
         window.dispatchEvent(new Event("jobprep:user-updated"));
         navigate('/login');
     };

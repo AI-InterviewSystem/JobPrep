@@ -1,4 +1,5 @@
 import { Routes, Route, useLocation, Navigate } from "react-router-dom"
+import { storage } from "../services/storage"
 import AnimatedPage from "../components/AnimatedPage"
 import Navbar from "../components/layout/Navbar"
 import Footer from "../components/layout/Footer"
@@ -22,14 +23,14 @@ import AdminLayout from "../layouts/AdminLayout"
 import PaymentResultPage from "../pages/PaymentResultPage"
 
 const ProtectedRoute = ({ children }) => {
-    const token = localStorage.getItem("token")
+    const token = storage.getToken()
     if (!token) return <Navigate to="/login" />
     return children
 }
 
 const AdminRoute = ({ children }) => {
-    const token = localStorage.getItem("token")
-    const user = JSON.parse(localStorage.getItem("user") || "{}")
+    const token = storage.getToken()
+    const user = storage.getUser()
     
     if (!token) return <Navigate to="/login" />
     if (user?.role !== "ADMIN") return <Navigate to="/dashboard" />

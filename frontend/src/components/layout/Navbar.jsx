@@ -1,11 +1,13 @@
 import { Link, useLocation } from "react-router-dom"
 import logo from "../../assets/images/jobprep-logo.png"
 import AvatarMenu from "./AvatarMenu"
+import { storage } from "../../services/storage"
 
 export default function Navbar() {
     const location = useLocation()
-    const user = JSON.parse(localStorage.getItem("user") || "{}")
+    const user = storage.getUser() || {}
     const isAdmin = user.role === "ADMIN"
+    const hasToken = !!storage.getToken()
 
     const isActive = (path) => location.pathname === path;
 
@@ -16,7 +18,7 @@ export default function Navbar() {
                 {/* Logo - Fixed width on the left */}
                 <div className="w-48 flex-shrink-0">
                     <Link 
-                        to={localStorage.getItem("token") ? (isAdmin ? "/admin" : "/dashboard") : "/"} 
+                        to={hasToken ? (isAdmin ? "/admin" : "/dashboard") : "/"} 
                         className="flex items-center gap-3"
                     >
                         <img src={logo} alt="JobPrep Logo" className="h-8" />
@@ -41,7 +43,7 @@ export default function Navbar() {
 
                 {/* Right actions - Fixed width on the right */}
                 <div className="w-48 flex-shrink-0 flex items-center justify-end gap-6">
-                    {!localStorage.getItem("token") ? (
+                    {!hasToken ? (
                         <>
                             <Link
                                 to="/login"

@@ -2,6 +2,7 @@ import { Link } from "react-router-dom"
 import { motion } from "framer-motion"
 import logo from "../assets/images/jobprep-logo.png"
 import AvatarMenu from "../components/layout/AvatarMenu"
+import { storage } from "../services/storage"
 
 const steps = [
     {
@@ -58,7 +59,7 @@ const footerLinks = {
 }
 
 export default function LandingPage() {
-    const token = localStorage.getItem("token")
+    const token = storage.getToken()
 
     return (
         <div className="min-h-screen bg-background-light font-display">

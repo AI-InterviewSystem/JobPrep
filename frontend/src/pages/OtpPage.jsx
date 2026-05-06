@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import { useNavigate, useSearchParams, Link } from "react-router-dom"
 import { motion } from "framer-motion"
 import { authApi } from "../services/api"
+import { storage } from "../services/storage"
 import logo from "../assets/images/jobprep-logo.png"
 
 export default function OtpPage() {
@@ -50,8 +51,8 @@ export default function OtpPage() {
         setError("")
         try {
             const response = await authApi.verifyOtp({ email, otpCode })
-            localStorage.setItem("token", response.data.token)
-            localStorage.setItem("user", JSON.stringify(response.data.user))
+            // New account registration: default to session-only (no rememberMe)
+            storage.setAuth(response.data.token, response.data.user, false)
             navigate("/dashboard")
         } catch (err) {
             setError(err.response?.data?.message || "Invalid or expired OTP code")
