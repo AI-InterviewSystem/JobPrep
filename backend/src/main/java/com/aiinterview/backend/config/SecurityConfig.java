@@ -96,6 +96,13 @@ public class SecurityConfig {
             com.aiinterview.backend.entity.User user = userRepository.findByEmail(email)
                     .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
+            if (Boolean.TRUE.equals(user.getIsBanned())) {
+                String reason = user.getBanReason() != null ? user.getBanReason() : "Violated terms of service";
+                String encodedReason = java.net.URLEncoder.encode(reason, "UTF-8");
+                response.sendRedirect(frontendUrl + "/login?error=Your account has been suspended: " + encodedReason);
+                return;
+            }
+
             String token = jwtService.generateToken(new UserPrincipal(user));
             response.sendRedirect(frontendUrl + "/auth/google-callback?token=" + token);
         };

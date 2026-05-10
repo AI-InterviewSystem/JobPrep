@@ -24,6 +24,7 @@ export default function AdminLayout() {
     const getPageTitle = () => {
         if (location.pathname.includes('/admin/profile')) return 'Admin Profile';
         if (location.pathname.includes('/admin/pricing-plans')) return 'Pricing Plans';
+        if (location.pathname.includes('/admin/users')) return 'Users';
         return 'Dashboard';
     };
 

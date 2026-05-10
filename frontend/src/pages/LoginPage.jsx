@@ -1,5 +1,5 @@
-import { useState } from "react"
-import { Link, useNavigate } from "react-router-dom"
+import { useState, useEffect } from "react"
+import { Link, useNavigate, useLocation } from "react-router-dom"
 import { motion } from "framer-motion"
 import { authApi } from "../services/api"
 import { storage } from "../services/storage"
@@ -11,6 +11,15 @@ export default function LoginPage() {
     const [error, setError] = useState("")
     const [loading, setLoading] = useState(false)
     const navigate = useNavigate()
+    const location = useLocation()
+
+    useEffect(() => {
+        const searchParams = new URLSearchParams(location.search)
+        const urlError = searchParams.get('error')
+        if (urlError) {
+            setError(urlError)
+        }
+    }, [location.search])
 
     const handleSubmit = async (e) => {
         e.preventDefault()
