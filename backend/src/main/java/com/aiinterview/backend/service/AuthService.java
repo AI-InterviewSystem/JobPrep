@@ -170,7 +170,7 @@ public class AuthService {
 
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new AppException("User not found"));
-        
+
         user.setLastLogin(LocalDateTime.now());
         userRepository.save(user);
 

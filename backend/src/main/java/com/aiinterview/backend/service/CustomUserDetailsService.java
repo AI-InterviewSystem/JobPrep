@@ -18,6 +18,12 @@ public class CustomUserDetailsService implements UserDetailsService {
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
+
+        if (Boolean.TRUE.equals(user.getIsBanned())) {
+            String reason = user.getBanReason() != null ? user.getBanReason() : "Violated terms of service";
+            throw new org.springframework.security.authentication.LockedException("Your account has been suspended: " + reason);
+        }
+
         return new UserPrincipal(user);
     }
 }

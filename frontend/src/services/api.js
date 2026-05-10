@@ -66,6 +66,12 @@ export const adminDashboardApi = {
     getStats: () => api.get('/admin/dashboard/stats')
 };
 
+export const adminUsersApi = {
+    getUsers: (params) => api.get('/admin/users', { params }),
+    banUser: (id, reason) => api.put(`/admin/users/${id}/ban`, { reason }),
+    unbanUser: (id) => api.put(`/admin/users/${id}/unban`),
+};
+
 export const publicPricingPlansApi = {
     getAll: () => api.get('/pricing-plans')
 };

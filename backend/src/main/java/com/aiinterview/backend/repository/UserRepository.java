@@ -1,6 +1,8 @@
 package com.aiinterview.backend.repository;
 
 import com.aiinterview.backend.entity.User;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -24,4 +26,14 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     List<Object[]> countNewUsersByDay(@Param("startDate") LocalDateTime startDate);
 
     List<User> findTop5ByOrderByCreatedAtDesc();
+
+    // Admin: search by email + filter by isBanned
+    @Query("SELECT u FROM User u WHERE " +
+           "(:email = '' OR LOWER(u.email) LIKE LOWER(CONCAT('%', :email, '%'))) AND " +
+           "(:isBanned IS NULL OR COALESCE(u.isBanned, false) = :isBanned) AND " +
+           "u.role != 'ADMIN'")
+    Page<User> findAllNonAdminUsers(
+            @Param("email") String email,
+            @Param("isBanned") Boolean isBanned,
+            Pageable pageable);
 }

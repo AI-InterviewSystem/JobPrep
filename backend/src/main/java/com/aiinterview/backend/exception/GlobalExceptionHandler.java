@@ -29,4 +29,11 @@ public class GlobalExceptionHandler {
         });
         return ResponseEntity.badRequest().body(errors);
     }
+    @ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
+    public ResponseEntity<Map<String, String>> handleAuthException(org.springframework.security.core.AuthenticationException ex) {
+        Map<String, String> error = new HashMap<>();
+        error.put("message", ex.getMessage());
+        // Trả về 400 Bad Request để frontend dễ dàng parse lỗi (giống AppException)
+        return ResponseEntity.badRequest().body(error);
+    }
 }

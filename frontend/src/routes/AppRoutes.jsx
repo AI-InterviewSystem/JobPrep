@@ -18,6 +18,7 @@ import LiveInterviewPage from "../pages/LiveInterviewPage"
 import InterviewResultPage from "../pages/InterviewResultPage"
 import OtpPage from "../pages/OtpPage"
 import AdminDashboard from "../pages/AdminDashboard"
+import AdminUsersPage from "../pages/AdminUsersPage"
 import AdminPricingPlansPage from "../pages/AdminPricingPlansPage"
 import CheckoutPage from "../pages/CheckoutPage"
 import AdminLayout from "../layouts/AdminLayout"
@@ -79,6 +80,7 @@ export default function AppRoutes() {
                     }>
                         <Route index element={<Navigate to="dashboard" replace />} />
                         <Route path="dashboard" element={<AdminDashboard />} />
+                        <Route path="users" element={<AdminUsersPage />} />
                         <Route path="pricing-plans" element={<AdminPricingPlansPage />} />
                         <Route path="profile" element={<ProfilePage />} />
                     </Route>
