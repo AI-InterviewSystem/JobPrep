@@ -72,6 +72,16 @@ export const adminUsersApi = {
     unbanUser: (id) => api.put(`/admin/users/${id}/unban`),
 };
 
+export const adminJobsApi = {
+    getCategories: () => api.get('/admin/jobs/categories'),
+    createCategory: (data) => api.post('/admin/jobs/categories', data),
+    updateCategory: (id, data) => api.put(`/admin/jobs/categories/${id}`, data),
+    deleteCategory: (id) => api.delete(`/admin/jobs/categories/${id}`),
+    createRole: (data) => api.post('/admin/jobs/roles', data),
+    updateRole: (id, data) => api.put(`/admin/jobs/roles/${id}`, data),
+    deleteRole: (id) => api.delete(`/admin/jobs/roles/${id}`),
+};
+
 export const publicPricingPlansApi = {
     getAll: () => api.get('/pricing-plans')
 };
