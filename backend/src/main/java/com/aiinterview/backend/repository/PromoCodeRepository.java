@@ -7,4 +7,5 @@ import java.util.UUID;
 
 public interface PromoCodeRepository extends JpaRepository<PromoCode, UUID> {
     Optional<PromoCode> findByCodeIgnoreCase(String code);
+    boolean existsByCode(String code);
 }
