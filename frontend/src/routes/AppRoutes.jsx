@@ -20,6 +20,7 @@ import OtpPage from "../pages/OtpPage"
 import AdminDashboard from "../pages/AdminDashboard"
 import AdminUsersPage from "../pages/AdminUsersPage"
 import AdminPricingPlansPage from "../pages/AdminPricingPlansPage"
+import AdminJobsPage from "../pages/AdminJobsPage"
 import CheckoutPage from "../pages/CheckoutPage"
 import AdminLayout from "../layouts/AdminLayout"
 import PaymentResultPage from "../pages/PaymentResultPage"
@@ -81,6 +82,7 @@ export default function AppRoutes() {
                         <Route index element={<Navigate to="dashboard" replace />} />
                         <Route path="dashboard" element={<AdminDashboard />} />
                         <Route path="users" element={<AdminUsersPage />} />
+                        <Route path="jobs" element={<AdminJobsPage />} />
                         <Route path="pricing-plans" element={<AdminPricingPlansPage />} />
                         <Route path="profile" element={<ProfilePage />} />
                     </Route>
