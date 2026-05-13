@@ -21,6 +21,7 @@ import AdminDashboard from "../pages/AdminDashboard"
 import AdminUsersPage from "../pages/AdminUsersPage"
 import AdminPricingPlansPage from "../pages/AdminPricingPlansPage"
 import AdminJobsPage from "../pages/AdminJobsPage"
+import AdminPromosPage from "../pages/AdminPromosPage"
 import CheckoutPage from "../pages/CheckoutPage"
 import AdminLayout from "../layouts/AdminLayout"
 import PaymentResultPage from "../pages/PaymentResultPage"
@@ -83,6 +84,7 @@ export default function AppRoutes() {
                         <Route path="dashboard" element={<AdminDashboard />} />
                         <Route path="users" element={<AdminUsersPage />} />
                         <Route path="jobs" element={<AdminJobsPage />} />
+                        <Route path="promos" element={<AdminPromosPage />} />
                         <Route path="pricing-plans" element={<AdminPricingPlansPage />} />
                         <Route path="profile" element={<ProfilePage />} />
                     </Route>

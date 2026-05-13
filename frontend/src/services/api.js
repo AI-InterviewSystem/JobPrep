@@ -82,6 +82,13 @@ export const adminJobsApi = {
     deleteRole: (id) => api.delete(`/admin/jobs/roles/${id}`),
 };
 
+export const adminPromosApi = {
+    getAll: () => api.get('/admin/promos'),
+    create: (data) => api.post('/admin/promos', data),
+    update: (id, data) => api.put(`/admin/promos/${id}`, data),
+    delete: (id) => api.delete(`/admin/promos/${id}`),
+};
+
 export const publicPricingPlansApi = {
     getAll: () => api.get('/pricing-plans')
 };
