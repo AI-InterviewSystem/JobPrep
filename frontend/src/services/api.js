@@ -103,7 +103,7 @@ export const paymentApi = {
 };
 
 export const promoApi = {
-    validate: (data) => api.post('/promo/validate', data),
+    validate: (data) => api.post('/api/promo/validate', data),
 };
 
 export default api;

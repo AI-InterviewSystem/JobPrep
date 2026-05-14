@@ -61,7 +61,8 @@ public class PaymentService {
         UserSubscription.BillingCycle cycle = UserSubscription.BillingCycle.valueOf(cycleStr.toUpperCase());
 
         // Check for existing active subscription
-        UserSubscription activeSub = subscriptionRepository.findFirstByUserEmailAndStatusOrderByCreatedAtDesc(email, UserSubscription.Status.ACTIVE)
+        UserSubscription activeSub = subscriptionRepository
+                .findFirstByUserEmailAndStatusOrderByCreatedAtDesc(email, UserSubscription.Status.ACTIVE)
                 .orElse(null);
 
         BigDecimal finalAmountUsd;
@@ -70,29 +71,32 @@ public class PaymentService {
         if (activeSub != null) {
             // Upgrade Flow
             paymentType = Payment.Type.UPGRADE;
-            
+
             // Calculate Proration
             LocalDateTime now = LocalDateTime.now();
             long daysLeft = 0;
             if (activeSub.getCurrentPeriodEnd() != null) {
                 daysLeft = java.time.temporal.ChronoUnit.DAYS.between(now, activeSub.getCurrentPeriodEnd());
             }
-            if (daysLeft < 0) daysLeft = 0;
+            if (daysLeft < 0)
+                daysLeft = 0;
 
             BigDecimal oldPriceMonthly = activeSub.getPlan().getPriceMonthly();
             BigDecimal remainingValue = oldPriceMonthly.divide(BigDecimal.valueOf(30), 2, RoundingMode.HALF_UP)
                     .multiply(BigDecimal.valueOf(daysLeft));
 
-            BigDecimal newPrice = (cycle == UserSubscription.BillingCycle.YEARLY) ? plan.getPriceYearly() : plan.getPriceMonthly();
+            BigDecimal newPrice = (cycle == UserSubscription.BillingCycle.YEARLY) ? plan.getPriceYearly()
+                    : plan.getPriceMonthly();
             finalAmountUsd = newPrice.subtract(remainingValue);
-            
+
             if (finalAmountUsd.compareTo(BigDecimal.ZERO) < 0) {
                 finalAmountUsd = BigDecimal.ZERO;
             }
         } else {
             // New Subscription Flow
             paymentType = Payment.Type.NEW_SUBSCRIPTION;
-            finalAmountUsd = (cycle == UserSubscription.BillingCycle.YEARLY) ? plan.getPriceYearly() : plan.getPriceMonthly();
+            finalAmountUsd = (cycle == UserSubscription.BillingCycle.YEARLY) ? plan.getPriceYearly()
+                    : plan.getPriceMonthly();
         }
 
         // Apply Promo Code if present
@@ -102,10 +106,14 @@ public class PaymentService {
             promoRequest.setCode(subscriptionRequest.getPromoCode());
             promoRequest.setPlanId(subscriptionRequest.getPlanId());
             promoRequest.setCycle(cycleStr);
-            
+
             PromoCodeResponse promoResponse = promoCodeService.validateAndCalculate(promoRequest, user);
             if (promoResponse.isValid()) {
-                finalAmountUsd = promoResponse.getFinalAmount();
+                BigDecimal discount = promoResponse.getDiscountAmount();
+                finalAmountUsd = finalAmountUsd.subtract(discount);
+                if (finalAmountUsd.compareTo(BigDecimal.ZERO) < 0) {
+                    finalAmountUsd = BigDecimal.ZERO;
+                }
                 promoCode = promoCodeRepository.findByCodeIgnoreCase(subscriptionRequest.getPromoCode()).orElse(null);
             }
         }
@@ -122,8 +130,9 @@ public class PaymentService {
         // Calculate amount in VND
         BigDecimal amountVnd = finalAmountUsd.multiply(BigDecimal.valueOf(exchangeRate));
         long finalAmountVnd = amountVnd.setScale(0, RoundingMode.HALF_UP).longValue();
-        
-        // PayOS requires amount > 2000 VND. If it's 0 (full credit), we might need a different flow, 
+
+        // PayOS requires amount > 2000 VND. If it's 0 (full credit), we might need a
+        // different flow,
         // but for now let's assume it's at least some amount or handle 0.
         if (finalAmountVnd < 2000 && finalAmountVnd > 0) {
             finalAmountVnd = 2000; // Minimum amount for PayOS
@@ -144,12 +153,19 @@ public class PaymentService {
                 .build();
         payment = paymentRepository.save(payment);
 
-        // If amount is 0, we could theoretically skip PayOS and activate immediately.
-        // But for simplicity in this flow, let's assume the user still goes through the link or we handle it.
-        // Actually, PayOS might fail with 0. 
+        // If amount is 0 (e.g. 100% OFF promo code), we skip PayOS and activate
+        // immediately.
         if (finalAmountVnd == 0) {
-            // Handle zero payment activation immediately?
-            // For now, let's proceed and see.
+            payment.setStatus(Payment.Status.PAID);
+            payment.setPaidAt(LocalDateTime.now());
+            payment = paymentRepository.save(payment);
+
+            activateSubscription(payment);
+
+            return PaymentResponse.builder()
+                    .checkoutUrl(frontendUrl + "/payment/success")
+                    .paymentId(String.valueOf(orderCode))
+                    .build();
         }
 
         // 3. Create PayOS Payment Link
@@ -224,13 +240,15 @@ public class PaymentService {
 
     private void activateSubscription(Payment payment) {
         UserSubscription subscription = payment.getSubscription();
-        if (subscription == null) return;
+        if (subscription == null)
+            return;
 
         User user = payment.getUser();
 
         // 1. If Upgrade, close old active subscriptions
         if (payment.getType() == Payment.Type.UPGRADE) {
-            List<UserSubscription> activeSubs = subscriptionRepository.findByUserAndStatus(user, UserSubscription.Status.ACTIVE);
+            List<UserSubscription> activeSubs = subscriptionRepository.findByUserAndStatus(user,
+                    UserSubscription.Status.ACTIVE);
             for (UserSubscription oldSub : activeSubs) {
                 oldSub.setStatus(UserSubscription.Status.EXPIRED);
                 subscriptionRepository.save(oldSub);
@@ -241,7 +259,7 @@ public class PaymentService {
         LocalDateTime now = LocalDateTime.now();
         subscription.setStatus(UserSubscription.Status.ACTIVE);
         subscription.setCurrentPeriodStart(now);
-        
+
         if (subscription.getBillingCycle() == UserSubscription.BillingCycle.YEARLY) {
             subscription.setCurrentPeriodEnd(now.plusDays(365));
         } else {
@@ -260,7 +278,7 @@ public class PaymentService {
             // Log error or ignore
         }
         subscription.setRemainingInterviews(interviews);
-        
+
         // 4. Set Auto Renew
         subscription.setCancelAtPeriodEnd(false);
 
@@ -269,7 +287,7 @@ public class PaymentService {
         // 5. Handle Promo Code Usage
         if (payment.getPromoCode() != null) {
             PromoCode promo = payment.getPromoCode();
-            
+
             // Record usage
             PromoCodeUsage usage = PromoCodeUsage.builder()
                     .promoCode(promo)
@@ -277,7 +295,7 @@ public class PaymentService {
                     .payment(payment)
                     .build();
             promoCodeUsageRepository.save(usage);
-            
+
             // Increment count
             promo.setUsedCount(promo.getUsedCount() + 1);
             promoCodeRepository.save(promo);
@@ -294,7 +312,8 @@ public class PaymentService {
                         .amount(payment.getAmount())
                         .currency(payment.getCurrency())
                         .status(payment.getStatus().name())
-                        .planName(payment.getSubscription() != null ? payment.getSubscription().getPlan().getName() : "N/A")
+                        .planName(payment.getSubscription() != null ? payment.getSubscription().getPlan().getName()
+                                : "N/A")
                         .build())
                 .collect(java.util.stream.Collectors.toList());
     }
@@ -302,7 +321,8 @@ public class PaymentService {
     @Transactional
     public void cancelSubscription() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        UserSubscription subscription = subscriptionRepository.findFirstByUserEmailAndStatusOrderByCreatedAtDesc(email, UserSubscription.Status.ACTIVE)
+        UserSubscription subscription = subscriptionRepository
+                .findFirstByUserEmailAndStatusOrderByCreatedAtDesc(email, UserSubscription.Status.ACTIVE)
                 .orElseThrow(() -> new AppException("No active subscription found"));
 
         subscription.setCancelAtPeriodEnd(true);
@@ -315,7 +335,7 @@ public class PaymentService {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         LocalDateTime now = LocalDateTime.now();
         return subscriptionRepository.findFirstByUserEmailAndStatusInOrderByCreatedAtDesc(
-                        email, List.of(UserSubscription.Status.ACTIVE, UserSubscription.Status.ACTIVE_NON_RENEWING))
+                email, List.of(UserSubscription.Status.ACTIVE, UserSubscription.Status.ACTIVE_NON_RENEWING))
                 .filter(sub -> sub.getCurrentPeriodEnd() == null || sub.getCurrentPeriodEnd().isAfter(now))
                 .map(sub -> SubscriptionStatusResponse.builder()
                         .planName(sub.getPlan().getName())
