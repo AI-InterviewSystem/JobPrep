@@ -20,8 +20,17 @@ public class FileController {
 
     @PostMapping("/upload")
     public ResponseEntity<?> uploadFile(@RequestParam("file") MultipartFile file) {
-        String url = fileService.save(file);
-        // Prepend base URL if needed, but relative usually works if frontend is on same domain or Proxy is set
+        String url;
+        String contentType = file.getContentType();
+        String filename = file.getOriginalFilename();
+
+        if ((contentType != null && contentType.toLowerCase().contains("pdf")) ||
+                (filename != null && filename.toLowerCase().endsWith(".pdf"))) {
+            url = fileService.saveCv(file);
+        } else {
+            url = fileService.save(file);
+        }
+
         return ResponseEntity.ok(Map.of("url", url));
     }
 }

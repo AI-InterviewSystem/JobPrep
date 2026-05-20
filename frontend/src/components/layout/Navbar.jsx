@@ -14,11 +14,11 @@ export default function Navbar() {
     return (
         <header className="w-full border-b border-primary/10 bg-white sticky top-0 z-50">
             <div className="max-w-7xl mx-auto flex items-center px-6 py-3">
-                
+
                 {/* Logo - Fixed width on the left */}
                 <div className="w-48 flex-shrink-0">
-                    <Link 
-                        to={hasToken ? (isAdmin ? "/admin" : "/dashboard") : "/"} 
+                    <Link
+                        to={hasToken ? (isAdmin ? "/admin" : "/dashboard") : "/"}
                         className="flex items-center gap-3"
                     >
                         <img src={logo} alt="JobPrep Logo" className="h-8" />
@@ -33,6 +33,7 @@ export default function Navbar() {
                     <Link to="/dashboard" className={`${isActive('/dashboard') ? 'text-primary' : 'hover:text-primary transition-colors'}`}>Dashboard</Link>
                     <Link to="/practice" className={`${isActive('/practice') ? 'text-primary' : 'hover:text-primary transition-colors'}`}>Practice</Link>
                     <Link to="/pricing" className={`${isActive('/pricing') ? 'text-primary' : 'hover:text-primary transition-colors'}`}>Pricing</Link>
+                    <Link to="/feedback" className={`${isActive('/feedback') ? 'text-primary' : 'hover:text-primary transition-colors'}`}>Feedback</Link>
                     {isAdmin && (
                         <Link to="/admin" className="text-red-500 hover:text-red-600 transition-colors flex items-center gap-1">
                             <span className="material-symbols-outlined text-sm">admin_panel_settings</span>
