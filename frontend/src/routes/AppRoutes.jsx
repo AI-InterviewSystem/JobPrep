@@ -25,6 +25,8 @@ import AdminPromosPage from "../pages/AdminPromosPage"
 import CheckoutPage from "../pages/CheckoutPage"
 import AdminLayout from "../layouts/AdminLayout"
 import PaymentResultPage from "../pages/PaymentResultPage"
+import UserFeedbackPage from "../pages/UserFeedbackPage"
+import AdminFeedbackPage from "../pages/AdminFeedbackPage"
 
 const ProtectedRoute = ({ children }) => {
     const token = storage.getToken()
@@ -35,10 +37,10 @@ const ProtectedRoute = ({ children }) => {
 const AdminRoute = ({ children }) => {
     const token = storage.getToken()
     const user = storage.getUser()
-    
+
     if (!token) return <Navigate to="/login" />
     if (user?.role !== "ADMIN") return <Navigate to="/dashboard" />
-    
+
     return children
 }
 
@@ -86,9 +88,15 @@ export default function AppRoutes() {
                         <Route path="jobs" element={<AdminJobsPage />} />
                         <Route path="promos" element={<AdminPromosPage />} />
                         <Route path="pricing-plans" element={<AdminPricingPlansPage />} />
+                        <Route path="feedbacks" element={<AdminFeedbackPage />} />
                         <Route path="profile" element={<ProfilePage />} />
                     </Route>
 
+                    <Route path="/feedback" element={
+                        <ProtectedRoute>
+                            <UserFeedbackPage />
+                        </ProtectedRoute>
+                    } />
 
                     <Route path="/profile" element={
                         <ProtectedRoute>

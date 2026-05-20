@@ -106,4 +106,15 @@ export const promoApi = {
     validate: (data) => api.post('/api/promo/validate', data),
 };
 
+export const feedbackApi = {
+    submit: (data) => api.post('/feedbacks', data),
+    getMine: () => api.get('/feedbacks/me'),
+};
+
+export const adminFeedbackApi = {
+    getAll: () => api.get('/admin/feedbacks'),
+    updateStatus: (id, data) => api.put(`/admin/feedbacks/${id}/status`, data),
+    getHistory: (id) => api.get(`/admin/feedbacks/${id}/history`),
+};
+
 export default api;
