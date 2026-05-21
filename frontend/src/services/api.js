@@ -66,6 +66,10 @@ export const jobCategoryApi = {
     list: () => api.get('/jobs/categories'),
 };
 
+export const jobGroupApi = {
+    list: () => api.get('/jobs/groups'),
+};
+
 export const adminPricingPlansApi = {
     getAll: () => api.get('/admin/pricing-plans'),
     create: (data) => api.post('/admin/pricing-plans', data),
@@ -84,6 +88,10 @@ export const adminUsersApi = {
 };
 
 export const adminJobsApi = {
+    getGroups: () => api.get('/admin/jobs/groups'),
+    createGroup: (data) => api.post('/admin/jobs/groups', data),
+    updateGroup: (id, data) => api.put(`/admin/jobs/groups/${id}`, data),
+    deleteGroup: (id) => api.delete(`/admin/jobs/groups/${id}`),
     getCategories: () => api.get('/admin/jobs/categories'),
     createCategory: (data) => api.post('/admin/jobs/categories', data),
     updateCategory: (id, data) => api.put(`/admin/jobs/categories/${id}`, data),

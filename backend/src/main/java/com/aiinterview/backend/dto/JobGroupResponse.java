@@ -10,12 +10,12 @@ import java.util.UUID;
 
 @Data
 @Builder
-@NoArgsConstructor
 @AllArgsConstructor
-public class JobCategoryResponse {
+@NoArgsConstructor
+public class JobGroupResponse {
     private UUID id;
     private String name;
     private String description;
-    private List<JobRoleResponse> roles;
-    private UUID groupId;
+    private boolean isActive;
+    private List<JobCategoryResponse> categories;
 }

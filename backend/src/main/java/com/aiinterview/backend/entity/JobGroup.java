@@ -12,14 +12,14 @@ import java.util.List;
 import java.util.UUID;
 
 @Entity
-@Table(name = "job_categories")
+@Table(name = "job_groups")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 @EntityListeners(AuditingEntityListener.class)
-public class JobCategory {
+public class JobGroup {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -31,13 +31,13 @@ public class JobCategory {
     @Column(columnDefinition = "text")
     private String description;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "group_id")
-    private JobGroup group;
-
-    @OneToMany(mappedBy = "category", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
-    private List<JobRole> roles = new ArrayList<>();
+    @Column(name = "is_active", nullable = false)
+    private boolean isActive = true;
+
+    @OneToMany(mappedBy = "group", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<JobCategory> categories = new ArrayList<>();
 
     @CreatedDate
     @Column(name = "created_at", updatable = false)
