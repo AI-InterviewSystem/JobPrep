@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "react-router-dom"
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { cvApi } from "../services/api"
+import { cvApi, jobDescriptionApi, jobCategoryApi } from "../services/api"
 import logo from "../assets/images/jobprep-logo.png"
 
 const industries = ["Software Engineering", "Data Science", "Marketing", "Finance", "Product Management"]
@@ -56,11 +56,131 @@ export default function InterviewSetupPage() {
     const [cvName, setCvName] = useState("")
     const [isAutoSelected, setIsAutoSelected] = useState(false)
     const [deleteConfirmId, setDeleteConfirmId] = useState(null)
+    const [jobDescription, setJobDescription] = useState("")
     const fileInputRef = useRef(null)
+
+    // Job Category & JD Library State
+    const [categories, setCategories] = useState([])
+    const [loadingCategories, setLoadingCategories] = useState(true)
+    const [keyRequirements, setKeyRequirements] = useState([])
+    const [newRequirement, setNewRequirement] = useState("")
+    const [isAnalyzingJD, setIsAnalyzingJD] = useState(false)
 
     useEffect(() => {
         fetchCvs()
+        fetchCategories()
     }, [])
+
+    const fetchCategories = async () => {
+        try {
+            const res = await jobCategoryApi.list()
+            setCategories(res.data)
+            if (res.data.length > 0) {
+                setSelectedIndustry(res.data[0].name)
+            }
+        } catch (err) {
+            console.error("Failed to fetch job categories", err)
+        } finally {
+            setLoadingCategories(false)
+        }
+    }
+
+    const handleAIAnalyze = () => {
+        if (!jobDescription || jobDescription.trim().length === 0) return
+
+        setIsAnalyzingJD(true)
+
+        setTimeout(() => {
+            const text = jobDescription.toLowerCase()
+            const commonKeywords = [
+                "react", "angular", "vue", "javascript", "typescript", "html", "css", "tailwind",
+                "java", "spring boot", "springboot", "hibernate", "jpa", "node.js", "nodejs", "express",
+                "python", "django", "flask", "fastapi", "golang", "go ", "c#", "dotnet", ".net",
+                "sql", "postgresql", "mysql", "mongodb", "redis", "docker", "kubernetes", "aws", "azure", "gcp",
+                "git", "ci/cd", "automation testing", "selenium", "manual testing", "qa", "agile", "scrum",
+                "machine learning", "deep learning", "ai", "nlp", "llm", "tensorflow", "pytorch",
+                "communication", "problem solving", "teamwork", "leadership", "english"
+            ]
+
+            const found = []
+            commonKeywords.forEach(kw => {
+                if (text.includes(kw)) {
+                    let display = kw.trim()
+                    if (display === "springboot") display = "Spring Boot"
+                    else if (display === "nodejs") display = "Node.js"
+                    else if (display === "dotnet") display = ".Net"
+                    else if (display === "gcp") display = "GCP"
+                    else if (display === "aws") display = "AWS"
+                    else if (display === "sql") display = "SQL"
+                    else if (display === "html") display = "HTML"
+                    else if (display === "css") display = "CSS"
+                    else if (display === "ci/cd") display = "CI/CD"
+                    else if (display === "qa") display = "QA"
+                    else if (display === "ai") display = "AI"
+                    else if (display === "nlp") display = "NLP"
+                    else if (display === "llm") display = "LLM"
+                    else {
+                        display = display.replace(/\b\w/g, c => c.toUpperCase())
+                    }
+                    if (!found.includes(display)) {
+                        found.push(display)
+                    }
+                }
+            })
+
+            const bulletRegex = /(?:^|\n)\s*[-*•+]\s*(.*?)(?=\n|$)/g
+            let match
+            let bulletCount = 0
+            while ((match = bulletRegex.exec(jobDescription)) !== null && bulletCount < 5) {
+                const phrase = match[1].trim()
+                if (phrase.length > 5 && phrase.length < 50 && !found.includes(phrase)) {
+                    const capitalized = phrase.charAt(0).toUpperCase() + phrase.slice(1)
+                    found.push(capitalized)
+                    bulletCount++
+                }
+            }
+
+            if (found.length === 0) {
+                found.push("Good Communication", "Problem Solving", "Team player")
+            }
+
+            setKeyRequirements(found)
+            setIsAnalyzingJD(false)
+        }, 1000)
+    }
+
+    const handleStartInterview = async () => {
+        let finalJdId = null
+        
+        if (jobDescription.trim().length > 0) {
+            try {
+                const categoryObj = categories.find(c => c.name === selectedIndustry)
+                const jobCategoryId = categoryObj ? categoryObj.id : null
+                
+                const res = await jobDescriptionApi.create({
+                    jobCategoryId,
+                    jobDescriptionText: jobDescription,
+                    keyRequirements,
+                    isPublic: false
+                })
+                finalJdId = res.data.id
+            } catch (err) {
+                console.error("Failed to save job description to database", err)
+            }
+        }
+
+        const setupState = {
+            jobDescription,
+            selectedIndustry,
+            selectedLevel,
+            selectedType,
+            keyRequirements,
+            jdId: finalJdId
+        }
+        localStorage.setItem("interview_setup", JSON.stringify(setupState))
+
+        navigate("/live-interview")
+    }
 
     const fetchCvs = async () => {
         try {
@@ -128,7 +248,8 @@ export default function InterviewSetupPage() {
 
     const completeAIScan = () => {
         setTimeout(() => {
-            const randomIndustry = industries[Math.floor(Math.random() * industries.length)]
+            const list = categories.length > 0 ? categories.map(c => c.name) : industries
+            const randomIndustry = list[Math.floor(Math.random() * list.length)]
             const randomLevel = experienceLevels[Math.floor(Math.random() * experienceLevels.length)].label
             const randomType = interviewTypes[Math.floor(Math.random() * interviewTypes.length)].label
 
@@ -318,6 +439,107 @@ export default function InterviewSetupPage() {
                             )}
                         </div>
                     </div>
+
+                    {/* Job Description Section */}
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                        <div className="flex items-center gap-2 mb-5">
+                            <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center text-orange-500">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                            </div>
+                            <h2 className="font-bold text-gray-900 text-lg">Job Description</h2>
+                        </div>
+                        <div className="space-y-3">
+                            <textarea
+                                value={jobDescription}
+                                onChange={(e) => setJobDescription(e.target.value)}
+                                placeholder="Paste the job description here to help AI tailor the interview questions to the specific role and requirements..."
+                                className="w-full h-40 p-4 rounded-xl border-2 border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none resize-none text-sm text-gray-700 placeholder-gray-400 transition-all"
+                            />
+                            <div className="flex items-center justify-between">
+                                <p className="text-xs text-gray-400">
+                                    {jobDescription.length} characters
+                                </p>
+                                <div className="flex items-center gap-4">
+                                    {jobDescription.trim().length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={handleAIAnalyze}
+                                            disabled={isAnalyzingJD}
+                                            className="text-xs font-bold text-primary hover:underline flex items-center gap-1"
+                                        >
+                                            {isAnalyzingJD ? (
+                                                <>
+                                                    <span className="w-3 h-3 rounded-full border-2 border-primary border-t-transparent animate-spin inline-block"></span>
+                                                    Analyzing...
+                                                </>
+                                            ) : (
+                                                <>🔮 Extract AI Tags</>
+                                            )}
+                                        </button>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setJobDescription("");
+                                            setKeyRequirements([]);
+                                        }}
+                                        className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                                    >
+                                        Clear
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Requirements Tags */}
+                            {keyRequirements.length > 0 && (
+                                <div className="mt-4 pt-4 border-t border-gray-100 animate-entry">
+                                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Key Requirements (AI Extracted)</label>
+                                    <div className="flex flex-wrap gap-2 mb-3">
+                                        {keyRequirements.map((req, idx) => (
+                                            <span key={idx} className="bg-primary/5 border border-primary/20 text-primary text-xs px-2.5 py-1 rounded-lg flex items-center gap-1.5 font-semibold">
+                                                {req}
+                                                <button type="button" onClick={() => setKeyRequirements(prev => prev.filter((_, i) => i !== idx))} className="hover:text-red-500 font-bold text-sm leading-none">×</button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <input 
+                                            type="text" 
+                                            value={newRequirement} 
+                                            onChange={e => setNewRequirement(e.target.value)} 
+                                            onKeyDown={e => {
+                                                if (e.key === 'Enter') {
+                                                    e.preventDefault();
+                                                    if (newRequirement.trim()) {
+                                                        setKeyRequirements(prev => [...prev, newRequirement.trim()]);
+                                                        setNewRequirement("");
+                                                    }
+                                                }
+                                            }}
+                                            placeholder="Add custom requirement tag & press Enter..." 
+                                            className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-gray-200 outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
+                                        />
+                                        <button 
+                                            type="button" 
+                                            onClick={() => {
+                                                if (newRequirement.trim()) {
+                                                    setKeyRequirements(prev => [...prev, newRequirement.trim()]);
+                                                    setNewRequirement("");
+                                                }
+                                            }}
+                                            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-xs font-bold transition-all"
+                                        >
+                                            Add
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                        </div>
+                    </div>
+
                     {/* Industry Selection */}
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
                         <div className="flex items-center gap-2 mb-5">
@@ -332,7 +554,7 @@ export default function InterviewSetupPage() {
                             transition={{ duration: 0.5, staggerChildren: 0.05 }}
                             className="flex flex-wrap gap-3"
                         >
-                            {industries.map((ind) => (
+                            {(categories.length > 0 ? categories.map(c => c.name) : industries).map((ind) => (
                                 <motion.button
                                     key={ind}
                                     initial={{ opacity: 0, scale: 0.9 }}
@@ -461,7 +683,7 @@ export default function InterviewSetupPage() {
                         Estimated duration: 30-45 minutes
                     </div>
                     <button
-                        onClick={() => navigate("/live-interview")}
+                        onClick={handleStartInterview}
                         className="flex items-center gap-3 bg-primary text-white px-12 py-4 rounded-2xl font-bold hover:bg-primary-dark transition-all hover:shadow-lg text-base"
                     >
                         Start Interview

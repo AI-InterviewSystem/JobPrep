@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
     FiHome, FiGrid, FiShoppingCart, FiShield,
-    FiBell, FiCalendar, FiMessageSquare, FiLogOut, FiSearch,
+    FiBell, FiCalendar, FiMessageSquare, FiLogOut,
     FiChevronDown,
     FiUser, FiBriefcase, FiTag
 } from 'react-icons/fi';
@@ -63,10 +63,6 @@ export default function AdminLayout() {
                             <FiShoppingCart className="text-lg" />
                             Pricing Plan
                         </Link>
-                        <a href="#" className="flex items-center gap-4 text-gray-500 px-4 py-3 rounded-2xl font-medium hover:bg-slate-100 hover:text-gray-900 transition-colors">
-                            <FiGrid className="text-lg" />
-                            Ecommerce
-                        </a>
                         <Link to="/admin/feedbacks" className={`flex items-center gap-4 px-4 py-3 rounded-2xl font-medium transition-transform ${location.pathname.includes('/admin/feedbacks') ? 'bg-primary text-white shadow-md shadow-primary/30 hover:scale-105' : 'text-gray-500 hover:bg-slate-100 hover:text-gray-900'}`}>
                             <FiMessageSquare className="text-lg" />
                             Feedback
@@ -85,19 +81,6 @@ export default function AdminLayout() {
                 {/* Header */}
                 <header className="flex justify-between items-center mb-8 sticky top-0 bg-slate-50/80 backdrop-blur-sm z-10 py-2 -mx-2 px-2 rounded-2xl">
                     <h2 className="text-2xl font-bold text-gray-900">{getPageTitle()}</h2>
-
-                    <div className="flex flex-1 max-w-md mx-8">
-                        <div className="relative w-full">
-                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                <FiSearch className="text-gray-400" />
-                            </div>
-                            <input
-                                type="text"
-                                placeholder="Search..."
-                                className="w-full bg-white border border-slate-200 rounded-full py-2 pl-12 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 shadow-sm"
-                            />
-                        </div>
-                    </div>
 
                     <div className="flex items-center gap-6">
                         <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-200 shrink-0">
