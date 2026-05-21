@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom"
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion"
 import logo from "../assets/images/jobprep-logo.png"
 
@@ -20,7 +20,7 @@ const logicMetrics = [
     { label: "Result Quantifiability", value: 75 },
 ]
 
-const SCORE = 85
+
 
 // Simple circular progress SVG
 function CircularScore({ score }) {
@@ -55,7 +55,10 @@ function CircularScore({ score }) {
 }
 
 export default function InterviewResultPage() {
-    const navigate = useNavigate()
+    const navigate = useNavigate();
+    const location = useLocation();
+    const result = location.state?.result;
+    const SCORE = result?.score ?? 85;
 
     return (
         <div className="min-h-screen bg-gray-50 font-display flex flex-col">
