@@ -11,6 +11,10 @@ import com.aiinterview.backend.repository.JobRoleRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import com.aiinterview.backend.entity.AdminAction;
+import com.aiinterview.backend.repository.AdminActionRepository;
 
 import java.util.List;
 import java.util.UUID;
@@ -23,6 +27,28 @@ public class JobManagementService {
     private final JobCategoryRepository categoryRepository;
     private final JobRoleRepository roleRepository;
     private final JobGroupRepository groupRepository;
+    private final AdminActionRepository adminActionRepository;
+    private final com.aiinterview.backend.repository.UserRepository userRepository;
+
+    private void logAdminAction(String actionType, String reason) {
+        String adminEmail = "system";
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated()) {
+            adminEmail = auth.getName();
+        }
+        try {
+            userRepository.findByEmail(adminEmail).ifPresent(admin -> {
+                AdminAction action = AdminAction.builder()
+                        .adminUser(admin)
+                        .actionType(actionType)
+                        .reason(reason)
+                        .build();
+                adminActionRepository.save(action);
+            });
+        } catch (Exception e) {
+            // Ignore logging errors
+        }
+    }
 
     // --- Job Group Methods ---
     @Transactional(readOnly = true)
@@ -42,7 +68,9 @@ public class JobManagementService {
                 .description(request.getDescription())
                 .isActive(request.isActive())
                 .build();
-        return mapToGroupResponse(groupRepository.save(group));
+        JobGroup saved = groupRepository.save(group);
+        logAdminAction("CREATE_JOB_GROUP", "Created job group: " + saved.getName());
+        return mapToGroupResponse(saved);
     }
 
     @Transactional
@@ -60,14 +88,19 @@ public class JobManagementService {
         group.setName(request.getName());
         group.setDescription(request.getDescription());
         group.setActive(request.isActive());
-        return mapToGroupResponse(groupRepository.save(group));
+        
+        JobGroup saved = groupRepository.save(group);
+        logAdminAction("UPDATE_JOB_GROUP", "Updated job group: " + saved.getName());
+        return mapToGroupResponse(saved);
     }
 
     @Transactional
     public void deleteGroup(UUID id) {
         JobGroup group = groupRepository.findById(id)
                 .orElseThrow(() -> new AppException("Group not found"));
+        String name = group.getName();
         groupRepository.delete(group);
+        logAdminAction("DELETE_JOB_GROUP", "Deleted job group: " + name);
     }
 
 
@@ -93,7 +126,9 @@ public class JobManagementService {
                 .description(request.getDescription())
                 .group(group)
                 .build();
-        return mapToCategoryResponse(categoryRepository.save(category));
+        JobCategory saved = categoryRepository.save(category);
+        logAdminAction("CREATE_JOB_CATEGORY", "Created job category: " + saved.getName());
+        return mapToCategoryResponse(saved);
     }
 
     @Transactional
@@ -117,7 +152,10 @@ public class JobManagementService {
         category.setName(request.getName());
         category.setDescription(request.getDescription());
         category.setGroup(group);
-        return mapToCategoryResponse(categoryRepository.save(category));
+        
+        JobCategory saved = categoryRepository.save(category);
+        logAdminAction("UPDATE_JOB_CATEGORY", "Updated job category: " + saved.getName());
+        return mapToCategoryResponse(saved);
     }
 
     @Transactional
@@ -125,11 +163,9 @@ public class JobManagementService {
         JobCategory category = categoryRepository.findById(id)
                 .orElseThrow(() -> new AppException("Category not found"));
         
-        // Kiểm tra ràng buộc dữ liệu (ví dụ: nếu có phỏng vấn liên quan đến ngành này - giả sử sau này có)
-        // Hiện tại chỉ cần kiểm tra xem có roles không, nếu cascade xóa hết thì ok, 
-        // nhưng user yêu cầu "kiểm tra ràng buộc", nên ta có thể báo lỗi nếu còn roles hoặc cho phép xóa luôn.
-        // Ở đây ta cho phép xóa cascade thông qua JPA nhưng có thể log lại.
+        String name = category.getName();
         categoryRepository.delete(category);
+        logAdminAction("DELETE_JOB_CATEGORY", "Deleted job category: " + name);
     }
 
     @Transactional
@@ -147,7 +183,9 @@ public class JobManagementService {
                 .category(category)
                 .build();
         
-        return mapToRoleResponse(roleRepository.save(role));
+        JobRole saved = roleRepository.save(role);
+        logAdminAction("CREATE_JOB_ROLE", "Created job role: " + saved.getName());
+        return mapToRoleResponse(saved);
     }
 
     @Transactional
@@ -162,15 +200,18 @@ public class JobManagementService {
         role.setDescription(request.getDescription());
         role.setCategory(category);
         
-        return mapToRoleResponse(roleRepository.save(role));
+        JobRole saved = roleRepository.save(role);
+        logAdminAction("UPDATE_JOB_ROLE", "Updated job role: " + saved.getName());
+        return mapToRoleResponse(saved);
     }
 
     @Transactional
     public void deleteRole(UUID id) {
-        if (!roleRepository.existsById(id)) {
-            throw new AppException("Role not found");
-        }
-        roleRepository.deleteById(id);
+        JobRole role = roleRepository.findById(id)
+                .orElseThrow(() -> new AppException("Role not found"));
+        String name = role.getName();
+        roleRepository.delete(role);
+        logAdminAction("DELETE_JOB_ROLE", "Deleted job role: " + name);
     }
 
     private JobGroupResponse mapToGroupResponse(JobGroup group) {

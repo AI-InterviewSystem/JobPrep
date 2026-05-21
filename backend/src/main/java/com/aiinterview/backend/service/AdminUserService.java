@@ -13,6 +13,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import com.aiinterview.backend.entity.AdminAction;
+import com.aiinterview.backend.repository.AdminActionRepository;
 
 import java.util.List;
 import java.util.Optional;
@@ -24,6 +28,28 @@ public class AdminUserService {
 
     private final UserRepository userRepository;
     private final UserSubscriptionRepository userSubscriptionRepository;
+    private final AdminActionRepository adminActionRepository;
+
+    private void logAdminAction(String actionType, String reason, User targetUser) {
+        String adminEmail = "system";
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated()) {
+            adminEmail = auth.getName();
+        }
+        try {
+            userRepository.findByEmail(adminEmail).ifPresent(admin -> {
+                AdminAction action = AdminAction.builder()
+                        .adminUser(admin)
+                        .targetUser(targetUser)
+                        .actionType(actionType)
+                        .reason(reason)
+                        .build();
+                adminActionRepository.save(action);
+            });
+        } catch (Exception e) {
+            // Ignore logging errors
+        }
+    }
 
     /**
      * Lấy danh sách user có phân trang, tìm kiếm email, lọc trạng thái
@@ -70,6 +96,8 @@ public class AdminUserService {
         user.setIsBanned(true);
         user.setBanReason(reason != null ? reason : "Violated terms of service");
         userRepository.save(user);
+        
+        logAdminAction("BAN_USER", "Banned user: " + user.getEmail() + " | Reason: " + user.getBanReason(), user);
         return mapToResponse(user);
     }
 
@@ -84,6 +112,8 @@ public class AdminUserService {
         user.setIsBanned(false);
         user.setBanReason(null);
         userRepository.save(user);
+        
+        logAdminAction("UNBAN_USER", "Unbanned user: " + user.getEmail(), user);
         return mapToResponse(user);
     }
 

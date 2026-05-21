@@ -14,6 +14,10 @@ import com.aiinterview.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import com.aiinterview.backend.entity.AdminAction;
+import com.aiinterview.backend.repository.AdminActionRepository;
 
 import java.util.List;
 import java.util.UUID;
@@ -26,6 +30,22 @@ public class FeedbackService {
     private final FeedbackRepository feedbackRepository;
     private final FeedbackHistoryRepository historyRepository;
     private final UserRepository userRepository;
+    private final AdminActionRepository adminActionRepository;
+
+    private void logAdminAction(String adminEmail, String actionType, String reason) {
+        try {
+            userRepository.findByEmail(adminEmail).ifPresent(admin -> {
+                AdminAction action = AdminAction.builder()
+                        .adminUser(admin)
+                        .actionType(actionType)
+                        .reason(reason)
+                        .build();
+                adminActionRepository.save(action);
+            });
+        } catch (Exception e) {
+            // Ignore logging errors
+        }
+    }
 
     @Transactional
     public FeedbackResponse submitFeedback(FeedbackRequest request, String email) {
@@ -87,6 +107,8 @@ public class FeedbackService {
                     .internalNote(request.getNote())
                     .build();
             historyRepository.save(history);
+            
+            logAdminAction(adminEmail, "UPDATE_FEEDBACK_STATUS", "Updated feedback " + feedbackId + " status to " + newStatus);
         }
 
         return mapToResponse(feedback);

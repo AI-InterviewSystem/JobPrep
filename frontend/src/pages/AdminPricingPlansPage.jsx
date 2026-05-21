@@ -7,6 +7,7 @@ export default function AdminPricingPlansPage() {
     const [plans, setPlans] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [deleteModal, setDeleteModal] = useState({ open: false, id: null });
     const [currentPlan, setCurrentPlan] = useState(null);
     const [formData, setFormData] = useState({
         name: '',
@@ -89,16 +90,19 @@ export default function AdminPricingPlansPage() {
         }
     };
 
-    const handleDelete = async (id) => {
-        if (window.confirm('Are you sure you want to delete this pricing plan?')) {
-            try {
-                await adminPricingPlansApi.delete(id);
-                toast.success('Pricing plan deleted successfully');
-                fetchPlans();
-            } catch (error) {
-                toast.error('Failed to delete pricing plan');
-                console.error(error);
-            }
+    const handleDeleteClick = (id) => setDeleteModal({ open: true, id });
+    const closeDeleteModal = () => setDeleteModal({ open: false, id: null });
+
+    const handleDeleteConfirm = async () => {
+        if (!deleteModal.id) return;
+        try {
+            await adminPricingPlansApi.delete(deleteModal.id);
+            toast.success('Pricing plan deleted successfully');
+            closeDeleteModal();
+            fetchPlans();
+        } catch (error) {
+            toast.error('Failed to delete pricing plan');
+            console.error(error);
         }
     };
 
@@ -148,7 +152,7 @@ export default function AdminPricingPlansPage() {
                                         <FiEdit2 />
                                     </button>
                                     <button 
-                                        onClick={() => handleDelete(plan.id)}
+                                        onClick={() => handleDeleteClick(plan.id)}
                                         className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                                     >
                                         <FiTrash2 />
@@ -266,6 +270,52 @@ export default function AdminPricingPlansPage() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Modal */}
+            {deleteModal.open && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
+                        {/* Modal Header */}
+                        <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center">
+                                    <FiTrash2 className="text-red-500 text-lg" />
+                                </div>
+                                <div>
+                                    <h3 className="font-black text-gray-900">Delete Plan</h3>
+                                </div>
+                            </div>
+                            <button onClick={closeDeleteModal} className="text-gray-400 hover:text-gray-600 transition-colors">
+                                <FiX className="text-xl" />
+                            </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="p-6">
+                            <p className="text-sm text-gray-600">
+                                Are you sure you want to delete this pricing plan? This action cannot be undone.
+                            </p>
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="p-6 pt-0 flex justify-end gap-3">
+                            <button
+                                onClick={closeDeleteModal}
+                                className="px-5 py-2.5 border border-gray-200 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleDeleteConfirm}
+                                className="px-5 py-2.5 bg-red-500 text-white rounded-xl text-sm font-bold hover:bg-red-600 transition-colors flex items-center gap-2"
+                            >
+                                <FiTrash2 className="text-sm" />
+                                Confirm Delete
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
