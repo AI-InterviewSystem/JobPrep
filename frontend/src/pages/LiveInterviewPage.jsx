@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { interviewSessionApi, profileApi } from "../services/api"
 
-const DEFAULT_TOTAL_QUESTIONS = 10
+const DEFAULT_TOTAL_QUESTIONS = 5
 const INITIAL_QUESTION = 1
 
 const defaultQuestion = `"Can you describe a challenging project you've worked on recently and specifically how you handled the communication with difficult stakeholders?"`
@@ -201,7 +201,7 @@ export default function LiveInterviewPage() {
     }
 
     const currentQuestionText = session?.questions?.[questionNum - 1]?.questionText || defaultQuestion
-    const totalQuestions = session?.questions?.length || DEFAULT_TOTAL_QUESTIONS
+    const totalQuestions = DEFAULT_TOTAL_QUESTIONS
     const progressPct = ((questionNum - 1) / totalQuestions) * 100
 
     const startQuestionCapture = () => {
@@ -274,6 +274,8 @@ export default function LiveInterviewPage() {
 
         try {
             await interviewSessionApi.submitAnswer(sessionId, answerData)
+            const updated = await interviewSessionApi.get(sessionId)
+            setSession(updated.data)
             transcriptRef.current = ""
             setCurrentTranscript("")
         } catch (err) {

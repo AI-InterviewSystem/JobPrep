@@ -57,8 +57,10 @@ function CircularScore({ score }) {
 export default function InterviewResultPage() {
     const navigate = useNavigate();
     const location = useLocation();
-    const result = location.state?.result;
-    const SCORE = result?.score ?? 85;
+    const session = location.state?.session || {};
+    const SCORE = session?.overallScore ?? 85;
+    const sessionStrengths = session?.strengths?.length ? session.strengths : strengths;
+    const sessionAreas = session?.weaknesses?.length ? session.weaknesses : areasToImprove;
 
     return (
         <div className="min-h-screen bg-gray-50 font-display flex flex-col">
@@ -105,7 +107,7 @@ export default function InterviewResultPage() {
                                     <span className="text-sm font-bold text-green-700">Strengths</span>
                                 </div>
                                 <ul className="space-y-2">
-                                    {strengths.map((s, i) => (
+                                    {sessionStrengths.map((s, i) => (
                                         <li key={i} className="text-xs text-green-800 flex gap-1.5">
                                             <span className="mt-1 shrink-0">•</span>
                                             {s}
@@ -121,7 +123,7 @@ export default function InterviewResultPage() {
                                     <span className="text-sm font-bold text-orange-600">Areas to Improve</span>
                                 </div>
                                 <ul className="space-y-2">
-                                    {areasToImprove.map((a, i) => (
+                                    {sessionAreas.map((a, i) => (
                                         <li key={i} className="text-xs text-orange-800 flex gap-1.5">
                                             <span className="mt-1 shrink-0">•</span>
                                             {a}
@@ -199,16 +201,22 @@ export default function InterviewResultPage() {
                         "Based on your interview for 'Tell me about a time you had to pivot your design strategy'..."
                     </p>
                     <div className="bg-white rounded-xl p-5 space-y-3">
-                        {[
-                            { label: "Situation", text: "At my previous company, we were 3 weeks away from launching a new checkout flow when usability testing revealed a 40% drop-off rate on mobile." },
-                            { label: "Task", text: "I needed to identify the root cause, propose a fix, and align the engineering team without delaying the launch by more than 2 days." },
-                            { label: "Action", text: "I conducted a rapid 24-hour audit, simplified the form fields by 30%, and introduced a 'one-tap' payment option. I presented the data-backed prototype to stakeholders to gain instant buy-in." },
-                            { label: "Result", text: "We launched with only a 48-hour delay. Post-launch metrics showed a 15% increase in conversion compared to the legacy system, and it became the new standard for our mobile experience." },
-                        ].map(({ label, text }) => (
-                            <p key={label} className="text-sm text-gray-700 leading-relaxed">
-                                <strong>{label}:</strong>{" "}{text}
+                        {session?.summaryText ? (
+                            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
+                                {session.summaryText}
                             </p>
-                        ))}
+                        ) : (
+                            [
+                                { label: "Situation", text: "At my previous company, we were 3 weeks away from launching a new checkout flow when usability testing revealed a 40% drop-off rate on mobile." },
+                                { label: "Task", text: "I needed to identify the root cause, propose a fix, and align the engineering team without delaying the launch by more than 2 days." },
+                                { label: "Action", text: "I conducted a rapid 24-hour audit, simplified the form fields by 30%, and introduced a 'one-tap' payment option. I presented the data-backed prototype to stakeholders to gain instant buy-in." },
+                                { label: "Result", text: "We launched with only a 48-hour delay. Post-launch metrics showed a 15% increase in conversion compared to the legacy system, and it became the new standard for our mobile experience." },
+                            ].map(({ label, text }) => (
+                                <p key={label} className="text-sm text-gray-700 leading-relaxed">
+                                    <strong>{label}:</strong>{" "}{text}
+                                </p>
+                            ))
+                        )}
                     </div>
                 </div>
 

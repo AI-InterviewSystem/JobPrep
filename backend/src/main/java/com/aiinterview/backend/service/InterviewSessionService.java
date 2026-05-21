@@ -6,7 +6,10 @@ import com.aiinterview.backend.entity.InterviewAnswer.InputType;
 import com.aiinterview.backend.entity.InterviewSession.InterviewStatus;
 import com.aiinterview.backend.exception.AppException;
 import com.aiinterview.backend.repository.*;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,6 +18,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class InterviewSessionService {
@@ -24,47 +28,9 @@ public class InterviewSessionService {
     private final InterviewAnswerRepository answerRepository;
     private final UserRepository userRepository;
     private final JobDescriptionRepository jobDescriptionRepository;
-
-    // ---- MOCK AI question bank by level/type ----
-    private static final Map<String, List<String>> QUESTION_BANK = new LinkedHashMap<>();
-    static {
-        QUESTION_BANK.put("default", Arrays.asList(
-            "Tell me about yourself and your professional background.",
-            "What are your greatest strengths and how do they contribute to your work?",
-            "Describe a challenging project you've worked on and how you handled it.",
-            "How do you prioritize tasks when working under tight deadlines?",
-            "Tell me about a time you had to work with a difficult team member. How did you handle it?",
-            "Where do you see yourself in five years?",
-            "What motivates you in your work?",
-            "Describe a situation where you had to learn a new skill quickly.",
-            "How do you handle constructive criticism?",
-            "Why are you interested in this role and our company?"
-        ));
-        QUESTION_BANK.put("technical", Arrays.asList(
-            "Explain the difference between REST and GraphQL APIs.",
-            "What is dependency injection and why is it useful?",
-            "Describe SOLID principles and give an example of each.",
-            "What is the difference between SQL and NoSQL databases?",
-            "Explain the concept of microservices architecture.",
-            "How would you handle authentication and authorization in a web application?",
-            "What is CI/CD and how does it benefit a software project?",
-            "Describe your approach to writing unit tests.",
-            "What are the trade-offs between synchronous and asynchronous processing?",
-            "How do you ensure the security of user data in your applications?"
-        ));
-        QUESTION_BANK.put("hr", Arrays.asList(
-            "Tell me about yourself.",
-            "Why do you want to work at our company?",
-            "What are your salary expectations?",
-            "Describe your ideal work environment.",
-            "How do you handle stress and pressure?",
-            "What is your greatest professional achievement?",
-            "Why are you leaving your current position?",
-            "How do you stay up-to-date with industry trends?",
-            "Describe your management style.",
-            "What are your long-term career goals?"
-        ));
-    }
+    private final CvUploadRepository cvUploadRepository;
+    private final AiApiClient aiApiClient;
+    private final ObjectMapper objectMapper;
 
     @Transactional
     public InterviewSessionResponse createSession(String userEmail, UUID jobDescriptionId) {
@@ -81,26 +47,7 @@ public class InterviewSessionService {
         }
 
         InterviewSession saved = sessionRepository.save(session);
-
-        // Mock: generate 10 questions
-        List<String> pool = QUESTION_BANK.getOrDefault("default", new ArrayList<>());
-        List<String> shuffled = new ArrayList<>(pool);
-        Collections.shuffle(shuffled);
-        List<String> selected = shuffled.subList(0, Math.min(10, shuffled.size()));
-
-        List<InterviewQuestion> questions = new ArrayList<>();
-        for (int i = 0; i < selected.size(); i++) {
-            InterviewQuestion q = InterviewQuestion.builder()
-                    .session(saved)
-                    .questionText(selected.get(i))
-                    .questionSource(QuestionSource.AI_GENERATED)
-                    .orderIndex(i + 1)
-                    .build();
-            questions.add(q);
-        }
-        questionRepository.saveAll(questions);
-
-        return buildResponse(saved, questions);
+        return buildResponse(saved, Collections.emptyList());
     }
 
     @Transactional(readOnly = true)
@@ -113,21 +60,75 @@ public class InterviewSessionService {
     @Transactional
     public InterviewSessionResponse startSession(UUID sessionId, String userEmail) {
         InterviewSession session = findSession(sessionId, userEmail);
-        session.setStatus(InterviewStatus.IN_PROGRESS);
-        session.setStartTime(LocalDateTime.now());
-        InterviewSession saved = sessionRepository.save(session);
-        List<InterviewQuestion> questions = questionRepository.findBySessionIdOrderByOrderIndexAsc(sessionId);
-        return buildResponse(saved, questions);
+        User user = session.getUser();
+
+        List<CvUpload> cvs = cvUploadRepository.findByUserAndDeletedAtIsNullOrderByCreatedAtDesc(user);
+        if (cvs.isEmpty() || cvs.get(0).getParsedData() == null) {
+            throw new AppException("Please upload and let AI extract your CV before starting.");
+        }
+        CvUpload latestCv = cvs.get(0);
+
+        try {
+            JsonNode cvDataNode = objectMapper.readTree(latestCv.getParsedData());
+            if (cvDataNode.has("data")) {
+                cvDataNode = cvDataNode.get("data");
+            }
+
+            Map<String, Object> req = new HashMap<>();
+            req.put("cv_data", cvDataNode);
+            if (session.getJobDescription() != null) {
+                req.put("job_description", session.getJobDescription().getJobDescriptionText());
+            } else {
+                req.put("job_description", "General technical interview.");
+            }
+            req.put("interview_type", "Technical");
+            req.put("interview_level", "Mid");
+            req.put("num_questions", 5);
+            req.put("passing_score", 0);
+
+            String aiResponse = aiApiClient.startInterview(req);
+            JsonNode resNode = objectMapper.readTree(aiResponse);
+
+            if (resNode.has("status") && "rejected".equals(resNode.get("status").asText())) {
+                throw new AppException("Rejected by AI: " +
+                        (resNode.has("message") ? resNode.get("message").asText() : "Score too low"));
+            }
+
+            session.setAiSessionId(resNode.has("session_id") ? resNode.get("session_id").asText() : null);
+            session.setStatus(InterviewStatus.IN_PROGRESS);
+            session.setStartTime(LocalDateTime.now());
+            InterviewSession saved = sessionRepository.save(session);
+
+            JsonNode nextQ = resNode.get("next_question");
+            List<InterviewQuestion> questions = new ArrayList<>();
+            if (nextQ != null && !nextQ.isNull()) {
+                InterviewQuestion q = InterviewQuestion.builder()
+                        .session(saved)
+                        .questionText(nextQ.has("question_text") ? nextQ.get("question_text").asText() : "")
+                        .aiQuestionId(nextQ.has("id") ? nextQ.get("id").asText() : "")
+                        .questionSource(QuestionSource.AI_GENERATED)
+                        .jobRequirementTag(nextQ.has("topic") ? nextQ.get("topic").asText() : "")
+                        .orderIndex(1)
+                        .build();
+                questionRepository.save(q);
+                questions.add(q);
+            }
+            return buildResponse(saved, questions);
+        } catch (AppException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("AI API Error", e);
+            throw new AppException("Failed to communicate with AI API: " + e.getMessage());
+        }
     }
 
     @Transactional
     public void submitAnswer(UUID sessionId, String userEmail, SubmitAnswerRequest request) {
-        findSession(sessionId, userEmail); // verify ownership
+        InterviewSession session = findSession(sessionId, userEmail);
 
         InterviewQuestion question = questionRepository.findById(request.getQuestionId())
                 .orElseThrow(() -> new AppException("Question not found"));
 
-        // Remove old answer if resubmitting
         answerRepository.findAll().stream()
                 .filter(a -> a.getQuestion().getId().equals(question.getId()))
                 .findFirst()
@@ -140,38 +141,101 @@ public class InterviewSessionService {
                 .durationSeconds(request.getDurationSeconds())
                 .build();
 
-        answerRepository.save(answer);
+        try {
+            Map<String, Object> req = new HashMap<>();
+            req.put("session_id", session.getAiSessionId());
+            req.put("question_id", question.getAiQuestionId());
+            req.put("user_answer", request.getAnswerText());
+
+            String aiResponse = aiApiClient.submitAnswer(req);
+            JsonNode resNode = objectMapper.readTree(aiResponse);
+
+            if (resNode.has("evaluation") && !resNode.get("evaluation").isNull()) {
+                JsonNode eval = resNode.get("evaluation");
+                answer.setScore(eval.has("score") ? eval.get("score").asInt() : null);
+                answer.setFeedback(eval.has("feedback") ? eval.get("feedback").asText() : null);
+                answer.setImprovedAnswer(eval.has("improved_answer") ? eval.get("improved_answer").asText() : null);
+                answer.setIsAnswerRelevant(
+                        eval.has("is_answer_relevant") ? eval.get("is_answer_relevant").asBoolean() : null);
+
+                if (eval.has("strengths") && eval.get("strengths").isArray()) {
+                    List<String> strengths = new ArrayList<>();
+                    eval.get("strengths").forEach(n -> strengths.add(n.asText()));
+                    answer.setStrengths(strengths);
+                }
+                if (eval.has("weaknesses") && eval.get("weaknesses").isArray()) {
+                    List<String> weaknesses = new ArrayList<>();
+                    eval.get("weaknesses").forEach(n -> weaknesses.add(n.asText()));
+                    answer.setWeaknesses(weaknesses);
+                }
+            }
+
+            answerRepository.save(answer);
+
+            JsonNode nextQ = resNode.get("next_question");
+            if (nextQ != null && !nextQ.isNull()) {
+                InterviewQuestion q = InterviewQuestion.builder()
+                        .session(session)
+                        .questionText(nextQ.has("question_text") ? nextQ.get("question_text").asText() : "")
+                        .aiQuestionId(nextQ.has("id") ? nextQ.get("id").asText() : "")
+                        .questionSource(QuestionSource.AI_GENERATED)
+                        .jobRequirementTag(nextQ.has("topic") ? nextQ.get("topic").asText() : "")
+                        .orderIndex((question.getOrderIndex() != null ? question.getOrderIndex() : 0) + 1)
+                        .build();
+                questionRepository.save(q);
+            }
+        } catch (Exception e) {
+            log.error("AI API Error", e);
+            throw new AppException("Failed to communicate with AI API: " + e.getMessage());
+        }
     }
 
     @Transactional
     public InterviewSessionResponse completeSession(UUID sessionId, String userEmail) {
         InterviewSession session = findSession(sessionId, userEmail);
-        List<InterviewQuestion> questions = questionRepository.findBySessionIdOrderByOrderIndexAsc(sessionId);
 
-        // Mock AI evaluation
-        BigDecimal score = BigDecimal.valueOf(70 + Math.random() * 25).setScale(2, java.math.RoundingMode.HALF_UP);
+        try {
+            Map<String, Object> req = new HashMap<>();
+            req.put("session_id", session.getAiSessionId());
 
-        List<String> strengths = Arrays.asList(
-            "Clear and structured communication",
-            "Good technical knowledge foundation",
-            "Positive attitude and eagerness to learn"
-        );
-        List<String> weaknesses = Arrays.asList(
-            "Could provide more specific examples",
-            "Some answers lacked quantifiable results",
-            "Consider expanding on problem-solving methodology"
-        );
+            String aiResponse = aiApiClient.getSummary(req);
+            JsonNode resNode = objectMapper.readTree(aiResponse);
 
-        session.setStatus(InterviewStatus.COMPLETED);
-        session.setEndTime(LocalDateTime.now());
-        session.setOverallScore(score);
-        session.setStrengths(strengths);
-        session.setWeaknesses(weaknesses);
-        session.setSummaryText("You demonstrated a solid understanding of core concepts with good communication skills. Your responses showed enthusiasm and relevant experience. To further improve, focus on providing specific, quantifiable examples using the STAR method (Situation, Task, Action, Result).");
-        session.setNextSteps("1. Practice the STAR method for behavioral questions.\n2. Review system design concepts.\n3. Prepare 3-5 specific examples of past achievements.\n4. Research industry trends relevant to your target role.");
+            if (resNode.has("final_result") && !resNode.get("final_result").isNull()) {
+                JsonNode finalRes = resNode.get("final_result");
+                if (finalRes.has("overall_score")) {
+                    session.setOverallScore(new BigDecimal(finalRes.get("overall_score").asText()));
+                }
+                if (finalRes.has("summary")) {
+                    session.setSummaryText(finalRes.get("summary").asText());
+                }
+                if (finalRes.has("strengths") && finalRes.get("strengths").isArray()) {
+                    List<String> list = new ArrayList<>();
+                    finalRes.get("strengths").forEach(n -> list.add(n.asText()));
+                    session.setStrengths(list);
+                }
+                if (finalRes.has("weaknesses") && finalRes.get("weaknesses").isArray()) {
+                    List<String> list = new ArrayList<>();
+                    finalRes.get("weaknesses").forEach(n -> list.add(n.asText()));
+                    session.setWeaknesses(list);
+                }
+                if (finalRes.has("improvement_suggestions") && finalRes.get("improvement_suggestions").isArray()) {
+                    List<String> str = new ArrayList<>();
+                    finalRes.get("improvement_suggestions").forEach(n -> str.add(n.asText()));
+                    session.setNextSteps(String.join("\n", str));
+                }
+            }
 
-        InterviewSession saved = sessionRepository.save(session);
-        return buildResponse(saved, questions);
+            session.setStatus(InterviewStatus.COMPLETED);
+            session.setEndTime(LocalDateTime.now());
+            InterviewSession saved = sessionRepository.save(session);
+
+            List<InterviewQuestion> questions = questionRepository.findBySessionIdOrderByOrderIndexAsc(sessionId);
+            return buildResponse(saved, questions);
+        } catch (Exception e) {
+            log.error("AI API Error", e);
+            throw new AppException("Failed to communicate with AI API for summary: " + e.getMessage());
+        }
     }
 
     @Transactional
@@ -192,7 +256,6 @@ public class InterviewSessionService {
                 .collect(Collectors.toList());
     }
 
-    // ---- Helpers ----
     private InterviewSession findSession(UUID sessionId, String userEmail) {
         InterviewSession session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new AppException("Session not found"));

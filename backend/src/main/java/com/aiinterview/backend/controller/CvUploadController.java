@@ -7,6 +7,7 @@ import com.aiinterview.backend.repository.CvUploadRepository;
 import com.aiinterview.backend.repository.UserRepository;
 import com.aiinterview.backend.service.FileService;
 import com.aiinterview.backend.service.UserPrincipal;
+import com.aiinterview.backend.service.AiApiClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -26,6 +27,7 @@ public class CvUploadController {
     private final CvUploadRepository cvUploadRepository;
     private final UserRepository userRepository;
     private final FileService fileService;
+    private final AiApiClient aiApiClient;
 
     @PostMapping("/upload")
     public ResponseEntity<CvUploadDto> uploadCv(
@@ -35,12 +37,13 @@ public class CvUploadController {
         User user = userRepository.findById(principal.getId())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // Single CV logic: Delete all existing CVs for this user before uploading new one
+        // Single CV logic: Delete all existing CVs for this user before uploading new
+        // one
         List<CvUpload> existingCvs = cvUploadRepository.findByUserAndDeletedAtIsNullOrderByCreatedAtDesc(user);
         for (CvUpload oldCv : existingCvs) {
             // Delete from Supabase storage
             fileService.delete(oldCv.getStoragePath());
-            
+
             // Soft delete in database
             oldCv.setDeletedAt(LocalDateTime.now());
             oldCv.setIsCurrent(false);
@@ -62,6 +65,18 @@ public class CvUploadController {
 
         CvUpload saved = cvUploadRepository.save(cvUpload);
 
+        try {
+            String aiResult = aiApiClient.extractCv(file);
+            saved.setParsedData(aiResult);
+            saved.setParseStatus("completed");
+        } catch (Exception e) {
+            String errorMsg = e.getMessage();
+            saved.setRawText(errorMsg != null && errorMsg.length() > 255 ? errorMsg.substring(0, 255) : errorMsg);
+            saved.setParseStatus("failed");
+        }
+
+        saved = cvUploadRepository.save(saved);
+
         return ResponseEntity.ok(mapToDto(saved));
     }
 
@@ -78,7 +93,7 @@ public class CvUploadController {
     public ResponseEntity<Void> deleteCv(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable UUID id) {
-        
+
         User user = userRepository.findById(principal.getId())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -104,7 +119,7 @@ public class CvUploadController {
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         List<CvUpload> cvs = cvUploadRepository.findByUserAndDeletedAtIsNullOrderByCreatedAtDesc(user);
-        
+
         CvUpload target = null;
         for (CvUpload cv : cvs) {
             if (cv.getId().equals(id)) {
@@ -116,7 +131,8 @@ public class CvUploadController {
             cvUploadRepository.save(cv);
         }
 
-        if (target == null) throw new RuntimeException("CV not found");
+        if (target == null)
+            throw new RuntimeException("CV not found");
 
         return ResponseEntity.ok(mapToDto(target));
     }
