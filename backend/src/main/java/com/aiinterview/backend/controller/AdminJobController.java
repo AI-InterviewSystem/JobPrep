@@ -2,6 +2,8 @@ package com.aiinterview.backend.controller;
 
 import com.aiinterview.backend.dto.JobCategoryRequest;
 import com.aiinterview.backend.dto.JobCategoryResponse;
+import com.aiinterview.backend.dto.JobGroupRequest;
+import com.aiinterview.backend.dto.JobGroupResponse;
 import com.aiinterview.backend.dto.JobRoleRequest;
 import com.aiinterview.backend.dto.JobRoleResponse;
 import com.aiinterview.backend.service.JobManagementService;
@@ -22,6 +24,31 @@ public class AdminJobController {
 
     private final JobManagementService jobService;
 
+    // --- Job Groups ---
+    @GetMapping("/groups")
+    public ResponseEntity<List<JobGroupResponse>> getAllGroups() {
+        return ResponseEntity.ok(jobService.getAllGroups());
+    }
+
+    @PostMapping("/groups")
+    public ResponseEntity<JobGroupResponse> createGroup(@Valid @RequestBody JobGroupRequest request) {
+        return ResponseEntity.ok(jobService.createGroup(request));
+    }
+
+    @PutMapping("/groups/{id}")
+    public ResponseEntity<JobGroupResponse> updateGroup(
+            @PathVariable UUID id,
+            @Valid @RequestBody JobGroupRequest request) {
+        return ResponseEntity.ok(jobService.updateGroup(id, request));
+    }
+
+    @DeleteMapping("/groups/{id}")
+    public ResponseEntity<Void> deleteGroup(@PathVariable UUID id) {
+        jobService.deleteGroup(id);
+        return ResponseEntity.ok().build();
+    }
+
+    // --- Job Categories ---
     @GetMapping("/categories")
     public ResponseEntity<List<JobCategoryResponse>> getAllCategories() {
         return ResponseEntity.ok(jobService.getAllCategories());

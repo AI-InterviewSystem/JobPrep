@@ -1,10 +1,10 @@
 import { Link, useNavigate } from "react-router-dom"
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { cvApi, jobDescriptionApi, jobCategoryApi } from "../services/api"
+import { cvApi, jobDescriptionApi, jobGroupApi } from "../services/api"
 import logo from "../assets/images/jobprep-logo.png"
 
-const industries = ["Software Engineering", "Data Science", "Marketing", "Finance", "Product Management"]
+
 
 const experienceLevels = [
     { label: "Intern", desc: "Still in university or recent grad" },
@@ -59,31 +59,38 @@ export default function InterviewSetupPage() {
     const [jobDescription, setJobDescription] = useState("")
     const fileInputRef = useRef(null)
 
-    // Job Category & JD Library State
-    const [categories, setCategories] = useState([])
-    const [loadingCategories, setLoadingCategories] = useState(true)
+    // Job Group / Category / Role 3-level state
+    const [groups, setGroups] = useState([])
+    const [loadingGroups, setLoadingGroups] = useState(true)
+    const [selectedGroup, setSelectedGroup] = useState(null)
+    const [selectedCategory, setSelectedCategory] = useState(null)
+    const [selectedRole, setSelectedRole] = useState(null)
     const [keyRequirements, setKeyRequirements] = useState([])
     const [newRequirement, setNewRequirement] = useState("")
     const [isAnalyzingJD, setIsAnalyzingJD] = useState(false)
 
     useEffect(() => {
         fetchCvs()
-        fetchCategories()
+        fetchGroups()
     }, [])
 
-    const fetchCategories = async () => {
+    const fetchGroups = async () => {
         try {
-            const res = await jobCategoryApi.list()
-            setCategories(res.data)
+            const res = await jobGroupApi.list()
+            setGroups(res.data)
             if (res.data.length > 0) {
-                setSelectedIndustry(res.data[0].name)
+                setSelectedGroup(res.data[0])
             }
         } catch (err) {
-            console.error("Failed to fetch job categories", err)
+            console.error("Failed to fetch job groups", err)
         } finally {
-            setLoadingCategories(false)
+            setLoadingGroups(false)
         }
     }
+
+    // Derived lists from selected group/category
+    const availableCategories = selectedGroup ? selectedGroup.categories || [] : []
+    const availableRoles = selectedCategory ? selectedCategory.roles || [] : []
 
     const handleAIAnalyze = () => {
         if (!jobDescription || jobDescription.trim().length === 0) return
@@ -154,8 +161,7 @@ export default function InterviewSetupPage() {
         
         if (jobDescription.trim().length > 0) {
             try {
-                const categoryObj = categories.find(c => c.name === selectedIndustry)
-                const jobCategoryId = categoryObj ? categoryObj.id : null
+                const jobCategoryId = selectedCategory ? selectedCategory.id : null
                 
                 const res = await jobDescriptionApi.create({
                     jobCategoryId,
@@ -171,7 +177,10 @@ export default function InterviewSetupPage() {
 
         const setupState = {
             jobDescription,
-            selectedIndustry,
+            selectedGroup: selectedGroup?.name || "",
+            selectedCategory: selectedCategory?.name || "",
+            selectedRole: selectedRole?.name || "",
+            selectedIndustry: selectedCategory?.name || selectedGroup?.name || "",
             selectedLevel,
             selectedType,
             keyRequirements,
@@ -248,12 +257,29 @@ export default function InterviewSetupPage() {
 
     const completeAIScan = () => {
         setTimeout(() => {
-            const list = categories.length > 0 ? categories.map(c => c.name) : industries
-            const randomIndustry = list[Math.floor(Math.random() * list.length)]
+            if (groups.length > 0) {
+                const randomGroup = groups[Math.floor(Math.random() * groups.length)]
+                setSelectedGroup(randomGroup)
+                
+                if (randomGroup.categories && randomGroup.categories.length > 0) {
+                    const randomCategory = randomGroup.categories[Math.floor(Math.random() * randomGroup.categories.length)]
+                    setSelectedCategory(randomCategory)
+
+                    if (randomCategory.roles && randomCategory.roles.length > 0) {
+                        const randomRole = randomCategory.roles[Math.floor(Math.random() * randomCategory.roles.length)]
+                        setSelectedRole(randomRole)
+                    } else {
+                        setSelectedRole(null)
+                    }
+                } else {
+                    setSelectedCategory(null)
+                    setSelectedRole(null)
+                }
+            }
+
             const randomLevel = experienceLevels[Math.floor(Math.random() * experienceLevels.length)].label
             const randomType = interviewTypes[Math.floor(Math.random() * interviewTypes.length)].label
 
-            setSelectedIndustry(randomIndustry)
             setSelectedLevel(randomLevel)
             setSelectedType(randomType)
 
@@ -540,48 +566,115 @@ export default function InterviewSetupPage() {
                         </div>
                     </div>
 
-                    {/* Industry Selection */}
+                    {/* Job Selection - 3 Columns */}
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
                         <div className="flex items-center gap-2 mb-5">
                             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                             </svg>
-                            <h2 className="font-bold text-gray-900 text-lg">Industry Selection</h2>
+                            <h2 className="font-bold text-gray-900 text-lg">Job Selection</h2>
                         </div>
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ duration: 0.5, staggerChildren: 0.05 }}
-                            className="flex flex-wrap gap-3"
-                        >
-                            {(categories.length > 0 ? categories.map(c => c.name) : industries).map((ind) => (
-                                <motion.button
-                                    key={ind}
-                                    initial={{ opacity: 0, scale: 0.9 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                    onClick={() => setSelectedIndustry(ind)}
-                                    className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all relative ${selectedIndustry === ind
-                                        ? "bg-primary text-white shadow-sm"
-                                        : "bg-gray-50 border border-gray-200 text-gray-600 hover:border-primary hover:text-primary"
-                                        }`}
-                                >
-                                    {ind}
-                                    {isAutoSelected && selectedIndustry === ind && (
-                                        <motion.div
-                                            initial={{ scale: 0 }}
-                                            animate={{ scale: 1 }}
-                                            className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-primary text-white rounded-full flex items-center justify-center border-2 border-white shadow-sm"
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-2 h-2" viewBox="0 0 20 20" fill="currentColor">
-                                                <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
-                                            </svg>
-                                        </motion.div>
-                                    )}
-                                </motion.button>
-                            ))}
-                        </motion.div>
+
+                        {loadingGroups ? (
+                            <div className="grid grid-cols-3 gap-4">
+                                {[0,1,2].map(i => (
+                                    <div key={i} className="h-48 bg-gray-50 rounded-xl animate-pulse" />
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {/* Column 1: Job Groups */}
+                                <div className="flex flex-col gap-1">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 px-1">Job Groups</p>
+                                    <div className="space-y-1 max-h-56 overflow-y-auto pr-1 scrollbar-thin">
+                                        {groups.length === 0 ? (
+                                            <p className="text-xs text-gray-400 italic text-center py-4">No data available</p>
+                                        ) : groups.map(group => (
+                                            <button
+                                                key={group.id}
+                                                onClick={() => {
+                                                    setSelectedGroup(group)
+                                                    setSelectedCategory(null)
+                                                    setSelectedRole(null)
+                                                }}
+                                                className={`w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                                                    selectedGroup?.id === group.id
+                                                        ? "bg-primary text-white shadow-md shadow-primary/20"
+                                                        : "bg-gray-50 text-gray-600 hover:bg-primary/5 hover:text-primary"
+                                                }`}
+                                            >
+                                                {group.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Column 2: Categories */}
+                                <div className="flex flex-col gap-1">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 px-1">Categories</p>
+                                    <div className="space-y-1 max-h-56 overflow-y-auto pr-1 scrollbar-thin">
+                                        {!selectedGroup ? (
+                                            <p className="text-xs text-gray-400 italic text-center py-4">← Select a group first</p>
+                                        ) : availableCategories.length === 0 ? (
+                                            <p className="text-xs text-gray-400 italic text-center py-4">No categories available</p>
+                                        ) : availableCategories.map(cat => (
+                                            <button
+                                                key={cat.id}
+                                                onClick={() => {
+                                                    setSelectedCategory(cat)
+                                                    setSelectedRole(null)
+                                                }}
+                                                className={`w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                                                    selectedCategory?.id === cat.id
+                                                        ? "bg-indigo-600 text-white shadow-md shadow-indigo-200"
+                                                        : "bg-gray-50 text-gray-600 hover:bg-indigo-50 hover:text-indigo-600"
+                                                }`}
+                                            >
+                                                {cat.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Column 3: Roles */}
+                                <div className="flex flex-col gap-1">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 px-1">Job Roles</p>
+                                    <div className="space-y-1 max-h-56 overflow-y-auto pr-1 scrollbar-thin">
+                                        {!selectedCategory ? (
+                                            <p className="text-xs text-gray-400 italic text-center py-4">← Select a category first</p>
+                                        ) : availableRoles.length === 0 ? (
+                                            <p className="text-xs text-gray-400 italic text-center py-4">No roles available</p>
+                                        ) : availableRoles.map(role => (
+                                            <button
+                                                key={role.id}
+                                                onClick={() => setSelectedRole(role)}
+                                                className={`w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                                                    selectedRole?.id === role.id
+                                                        ? "bg-emerald-600 text-white shadow-md shadow-emerald-200"
+                                                        : "bg-gray-50 text-gray-600 hover:bg-emerald-50 hover:text-emerald-600"
+                                                }`}
+                                            >
+                                                {role.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Selection Summary */}
+                        {(selectedGroup || selectedCategory || selectedRole) && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 6 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="mt-4 pt-4 border-t border-gray-100 flex flex-wrap items-center gap-2"
+                            >
+                                <span className="text-xs text-gray-400 font-semibold">Selected:</span>
+                                {selectedGroup && <span className="px-2.5 py-1 bg-primary/10 text-primary text-xs font-bold rounded-lg">{selectedGroup.name}</span>}
+                                {selectedCategory && <><span className="text-gray-300">›</span><span className="px-2.5 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-lg">{selectedCategory.name}</span></>}
+                                {selectedRole && <><span className="text-gray-300">›</span><span className="px-2.5 py-1 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-lg">{selectedRole.name}</span></>}
+                            </motion.div>
+                        )}
                     </div>
 
                     {/* Experience Level */}

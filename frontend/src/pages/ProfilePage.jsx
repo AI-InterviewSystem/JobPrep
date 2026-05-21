@@ -16,7 +16,7 @@ const normalizeAvatarUrl = (url) => {
 export default function ProfilePage() {
     const [profile, setProfile] = useState(null)
     const [editMode, setEditMode] = useState(false)
-    const [activeTab, setActiveTab] = useState("profile") 
+    const [activeTab, setActiveTab] = useState("profile")
     const [formData, setFormData] = useState({
         fullName: "",
         phone: "",
@@ -187,7 +187,7 @@ export default function ProfilePage() {
                 <div className="flex flex-col items-center gap-4">
                     <span className="material-symbols-outlined text-4xl text-rose-500">error</span>
                     <span>Could not load profile. Please try again later.</span>
-                    <button 
+                    <button
                         onClick={() => window.location.reload()}
                         className="mt-4 bg-primary text-white px-6 py-2 rounded-xl font-bold"
                     >
@@ -202,33 +202,35 @@ export default function ProfilePage() {
         <div className="min-h-screen bg-[#F8FAFC] flex flex-col font-display text-slate-900">
             <main className="flex-1 max-w-5xl mx-auto w-full px-6 py-12 space-y-8">
                 {/* Header Section */}
-                <div className="flex flex-col gap-2">
-                    <h1 className="text-4xl font-black text-slate-900 tracking-tight">Account Settings</h1>
-                    <p className="text-slate-500 font-medium text-lg">Manage your personal information and security.</p>
-                </div>
+                {profile?.role !== 'ADMIN' && (
+                    <div className="flex flex-col gap-2">
+                        <h1 className="text-4xl font-black text-slate-900 tracking-tight">Account Settings</h1>
+                        <p className="text-slate-500 font-medium text-lg">Manage your personal information and security</p>
+                    </div>
+                )}
 
                 {/* Tabs Navigation */}
                 <div className="flex items-center gap-1 bg-slate-100 p-1.5 rounded-[1.25rem] w-fit">
                     <button
                         onClick={() => setActiveTab("profile")}
-                        className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                            activeTab === "profile" 
-                            ? "bg-white text-primary shadow-sm" 
+                        className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === "profile"
+                            ? "bg-white text-primary shadow-sm"
                             : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
-                        }`}
+                            }`}
                     >
                         Profile Information
                     </button>
-                    <button
-                        onClick={() => setActiveTab("payment")}
-                        className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                            activeTab === "payment" 
-                            ? "bg-white text-primary shadow-sm" 
-                            : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
-                        }`}
-                    >
-                        Payment History
-                    </button>
+                    {profile?.role !== 'ADMIN' && (
+                        <button
+                            onClick={() => setActiveTab("payment")}
+                            className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === "payment"
+                                ? "bg-white text-primary shadow-sm"
+                                : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+                                }`}
+                        >
+                            Payment History
+                        </button>
+                    )}
                 </div>
 
                 <AnimatePresence mode="wait">
@@ -252,13 +254,12 @@ export default function ProfilePage() {
                                         </div>
                                         <h2 className="text-2xl font-bold text-slate-800">Personal Details</h2>
                                     </div>
-                                    <button 
+                                    <button
                                         onClick={() => setEditMode(!editMode)}
-                                        className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-bold transition-all ${
-                                            editMode 
-                                            ? "bg-slate-100 text-slate-600 hover:bg-slate-200" 
+                                        className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-bold transition-all ${editMode
+                                            ? "bg-slate-100 text-slate-600 hover:bg-slate-200"
                                             : "bg-primary text-white hover:shadow-lg hover:shadow-primary/30 hover:-translate-y-0.5 active:translate-y-0"
-                                        }`}
+                                            }`}
                                     >
                                         <span className="material-symbols-outlined text-lg">{editMode ? "close" : "edit"}</span>
                                         {editMode ? "Cancel" : "Edit Profile"}
@@ -266,11 +267,10 @@ export default function ProfilePage() {
                                 </div>
 
                                 {msg.text && (
-                                    <div className={`p-4 rounded-2xl mb-8 text-sm font-semibold flex items-center gap-3 ${
-                                        msg.type === "success" 
-                                        ? "bg-emerald-50 text-emerald-700 border border-emerald-100" 
+                                    <div className={`p-4 rounded-2xl mb-8 text-sm font-semibold flex items-center gap-3 ${msg.type === "success"
+                                        ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
                                         : "bg-rose-50 text-rose-700 border border-rose-100"
-                                    }`}>
+                                        }`}>
                                         <span className="material-symbols-outlined text-lg">{msg.type === "success" ? "check_circle" : "error"}</span>
                                         {msg.text}
                                     </div>
@@ -283,10 +283,10 @@ export default function ProfilePage() {
                                             <div className="relative group">
                                                 <div className="w-44 h-44 rounded-full overflow-hidden bg-slate-100 border-4 border-white shadow-2xl flex-shrink-0 ring-8 ring-slate-50">
                                                     {profile.avatarUrl ? (
-                                                        <img 
-                                                            src={profile.avatarUrl.startsWith('/') ? `${import.meta.env.VITE_API_BASE_URL}${profile.avatarUrl}` : profile.avatarUrl} 
-                                                            alt="Avatar" 
-                                                            className="w-full h-full object-cover" 
+                                                        <img
+                                                            src={profile.avatarUrl.startsWith('/') ? `${import.meta.env.VITE_API_BASE_URL}${profile.avatarUrl}` : profile.avatarUrl}
+                                                            alt="Avatar"
+                                                            className="w-full h-full object-cover"
                                                         />
                                                     ) : (
                                                         <div className="w-full h-full flex items-center justify-center text-slate-300 bg-slate-50">
@@ -299,9 +299,8 @@ export default function ProfilePage() {
                                                 </div>
                                             </div>
                                             <div className="text-center">
-                                                <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                                                    profile.role === 'ADMIN' ? "bg-rose-50 text-rose-600 border border-rose-100" : "bg-primary/5 text-primary border border-primary/10"
-                                                }`}>
+                                                <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider ${profile.role === 'ADMIN' ? "bg-rose-50 text-rose-600 border border-rose-100" : "bg-primary/5 text-primary border border-primary/10"
+                                                    }`}>
                                                     {profile.role || "USER"}
                                                 </span>
                                             </div>
@@ -337,9 +336,8 @@ export default function ProfilePage() {
                                                 <div className="space-y-1.5">
                                                     <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Account Status</p>
                                                     <div className="flex">
-                                                        <span className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider ${
-                                                            profile.emailVerified ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-amber-50 text-amber-700 border border-amber-100"
-                                                        }`}>
+                                                        <span className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider ${profile.emailVerified ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-amber-50 text-amber-700 border border-amber-100"
+                                                            }`}>
                                                             <span className={`h-1.5 w-1.5 rounded-full ${profile.emailVerified ? "bg-emerald-500" : "bg-amber-500"}`}></span>
                                                             {profile.emailVerified ? "Verified" : "Unverified"}
                                                         </span>
@@ -366,9 +364,9 @@ export default function ProfilePage() {
                                                             <div className="h-8 w-8 border-3 border-primary border-t-transparent rounded-full animate-spin"></div>
                                                         ) : (
                                                             formData.avatarUrl ? (
-                                                                <img 
-                                                                    src={formData.avatarUrl.startsWith('/') ? `${import.meta.env.VITE_API_BASE_URL}${formData.avatarUrl}` : formData.avatarUrl} 
-                                                                    className="w-full h-full object-cover" 
+                                                                <img
+                                                                    src={formData.avatarUrl.startsWith('/') ? `${import.meta.env.VITE_API_BASE_URL}${formData.avatarUrl}` : formData.avatarUrl}
+                                                                    className="w-full h-full object-cover"
                                                                 />
                                                             ) : (
                                                                 <span className="material-symbols-outlined text-slate-300" style={{ fontSize: '64px' }}>add_a_photo</span>
@@ -391,18 +389,18 @@ export default function ProfilePage() {
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                     <div className="space-y-2">
                                                         <label className="text-xs font-black text-slate-500 uppercase tracking-widest ml-1">Full Name</label>
-                                                        <input 
-                                                            type="text" 
+                                                        <input
+                                                            type="text"
                                                             value={formData.fullName}
-                                                            onChange={(e) => setFormData({...formData, fullName: e.target.value})}
+                                                            onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                                                             className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all font-bold"
                                                             placeholder="Enter your full name"
                                                         />
                                                     </div>
                                                     <div className="space-y-2">
                                                         <label className="text-xs font-black text-slate-500 uppercase tracking-widest ml-1">Email Address (Read-only)</label>
-                                                        <input 
-                                                            type="email" 
+                                                        <input
+                                                            type="email"
                                                             value={profile.email}
                                                             disabled
                                                             className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed outline-none font-bold"
@@ -410,31 +408,31 @@ export default function ProfilePage() {
                                                     </div>
                                                     <div className="space-y-2">
                                                         <label className="text-xs font-black text-slate-500 uppercase tracking-widest ml-1">Phone Number</label>
-                                                        <input 
-                                                            type="text" 
+                                                        <input
+                                                            type="text"
                                                             value={formData.phone}
-                                                            onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                                                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                                                             className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all font-bold"
                                                             placeholder="+1 (555) 000-0000"
                                                         />
                                                     </div>
                                                     <div className="space-y-2">
                                                         <label className="text-xs font-black text-slate-500 uppercase tracking-widest ml-1">Date of Birth</label>
-                                                        <input 
-                                                            type="date" 
+                                                        <input
+                                                            type="date"
                                                             value={formData.dob}
-                                                            onChange={(e) => setFormData({...formData, dob: e.target.value})}
+                                                            onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
                                                             className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all font-bold"
                                                         />
                                                     </div>
                                                 </div>
-                                                
+
                                                 <div className="space-y-2">
                                                     <label className="text-xs font-black text-slate-500 uppercase tracking-widest ml-1">About Me</label>
-                                                    <textarea 
+                                                    <textarea
                                                         rows="4"
                                                         value={formData.bio}
-                                                        onChange={(e) => setFormData({...formData, bio: e.target.value})}
+                                                        onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
                                                         className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all font-bold resize-none"
                                                         placeholder="Write a few lines about yourself..."
                                                     ></textarea>
@@ -443,14 +441,14 @@ export default function ProfilePage() {
                                         </div>
 
                                         <div className="flex items-center justify-end gap-4 pt-8 border-t border-slate-50">
-                                            <button 
-                                                type="button" 
+                                            <button
+                                                type="button"
                                                 onClick={() => setEditMode(false)}
                                                 className="px-8 py-4 rounded-2xl font-bold text-slate-400 hover:text-slate-600 transition-all uppercase text-xs tracking-widest"
                                             >
                                                 Discard
                                             </button>
-                                            <button 
+                                            <button
                                                 type="submit"
                                                 disabled={uploading}
                                                 className="bg-primary text-white px-10 py-4 rounded-2xl font-bold hover:shadow-2xl hover:shadow-primary/30 hover:-translate-y-0.5 active:translate-y-0 transition-all uppercase text-xs tracking-widest disabled:opacity-50 disabled:translate-y-0"
@@ -475,10 +473,10 @@ export default function ProfilePage() {
                                     <div className="space-y-6">
                                         <div className="space-y-2">
                                             <label className="text-s font-black text-slate-500 tracking-widest ml-1">Current Password</label>
-                                            <input 
-                                                type="password" 
+                                            <input
+                                                type="password"
                                                 value={passwordData.oldPassword}
-                                                onChange={(e) => setPasswordData({...passwordData, oldPassword: e.target.value})}
+                                                onChange={(e) => setPasswordData({ ...passwordData, oldPassword: e.target.value })}
                                                 required
                                                 className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all font-bold"
                                                 placeholder="••••••••"
@@ -486,10 +484,10 @@ export default function ProfilePage() {
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-s font-black text-slate-500 tracking-widest ml-1">New Password</label>
-                                            <input 
-                                                type="password" 
+                                            <input
+                                                type="password"
                                                 value={passwordData.newPassword}
-                                                onChange={(e) => setPasswordData({...passwordData, newPassword: e.target.value})}
+                                                onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
                                                 required
                                                 className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all font-bold"
                                                 placeholder="••••••••"
@@ -498,16 +496,16 @@ export default function ProfilePage() {
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-s font-black text-slate-500 tracking-widest ml-1">Confirm New Password</label>
-                                            <input 
-                                                type="password" 
+                                            <input
+                                                type="password"
                                                 value={passwordData.confirmPassword}
-                                                onChange={(e) => setPasswordData({...passwordData, confirmPassword: e.target.value})}
+                                                onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
                                                 required
                                                 className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all font-bold"
                                                 placeholder="••••••••"
                                             />
                                         </div>
-                                        <button 
+                                        <button
                                             type="submit"
                                             className="bg-slate-900 text-white px-10 py-4 rounded-2xl font-bold hover:bg-black transition-all hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 uppercase text-xs tracking-widest w-full md:w-auto"
                                         >
@@ -522,7 +520,7 @@ export default function ProfilePage() {
                                         <div className="space-y-2 relative">
                                             <h3 className="font-bold text-slate-800 text-lg">Security Recommendations</h3>
                                             <p className="text-sm text-slate-500 leading-relaxed font-medium">
-                                                We recommend using a unique password for JobPrep to ensure your account security. 
+                                                We recommend using a unique password for JobPrep to ensure your account security.
                                                 Avoid reusing passwords from other sensitive accounts.
                                             </p>
                                         </div>
@@ -597,7 +595,7 @@ export default function ProfilePage() {
                                 ) : (
                                     <div className="p-8 bg-slate-50 rounded-3xl text-center border border-dashed border-slate-200">
                                         <p className="text-slate-500 font-medium">You don't have an active subscription.</p>
-                                        <button 
+                                        <button
                                             className="mt-4 text-primary font-bold hover:underline"
                                             onClick={() => window.location.href = "/pricing"}
                                         >
@@ -654,11 +652,10 @@ export default function ProfilePage() {
                                                             {tx.amount.toLocaleString()} {tx.currency}
                                                         </td>
                                                         <td className="px-6 py-4 bg-slate-50 last:rounded-r-2xl text-center group-hover:bg-slate-100 transition-colors">
-                                                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                                                                tx.status === 'PAID' ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : 
+                                                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${tx.status === 'PAID' ? "bg-emerald-50 text-emerald-600 border border-emerald-100" :
                                                                 tx.status === 'PENDING' ? "bg-amber-50 text-amber-600 border border-amber-100" :
-                                                                "bg-rose-50 text-rose-600 border border-rose-100"
-                                                            }`}>
+                                                                    "bg-rose-50 text-rose-600 border border-rose-100"
+                                                                }`}>
                                                                 {tx.status}
                                                             </span>
                                                         </td>
@@ -700,16 +697,16 @@ export default function ProfilePage() {
                             className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md p-8 md:p-10 relative overflow-hidden"
                         >
                             <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/5 rounded-full -mr-16 -mt-16 blur-2xl"></div>
-                            
+
                             <div className="flex flex-col items-center text-center gap-6 relative">
                                 <div className="w-20 h-20 rounded-[2rem] bg-rose-50 flex items-center justify-center">
                                     <span className="material-symbols-outlined text-rose-500 text-4xl animate-pulse">heart_broken</span>
                                 </div>
-                                
+
                                 <div className="space-y-2">
                                     <h3 className="text-2xl font-black text-slate-900 tracking-tight">Wait, don't go!</h3>
                                     <p className="text-slate-500 font-medium leading-relaxed">
-                                        Are you sure you want to cancel? You'll lose access to premium AI features 
+                                        Are you sure you want to cancel? You'll lose access to premium AI features
                                         after <span className="font-bold text-slate-700">
                                             {subscription?.currentPeriodEnd ? (() => {
                                                 const d = new Date(subscription.currentPeriodEnd);
