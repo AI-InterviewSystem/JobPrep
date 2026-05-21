@@ -129,11 +129,7 @@ export default function AdminJobsPage() {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Job Management</h1>
-                    <p className="text-sm text-gray-500">Manage industries and specific roles</p>
-                </div>
+            <div className="flex items-center justify-end">
                 <button
                     onClick={() => setCategoryModal({ open: true, mode: 'create', data: null })}
                     className="flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-xl font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"

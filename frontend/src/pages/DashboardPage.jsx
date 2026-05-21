@@ -1,8 +1,11 @@
 import { motion } from "framer-motion"
 import { Link } from "react-router-dom"
 import logo from "../assets/images/jobprep-logo.png"
+import { storage } from "../services/storage"
 
 export default function DashboardPage() {
+    const user = storage.getUser() || {}
+    const userName = user.fullName || "User"
     return (
         <div className="bg-[#f8fafc] font-display text-slate-900 min-h-screen">
             <div className="relative flex h-auto min-h-screen w-full flex-col group/design-root overflow-x-hidden">
@@ -23,7 +26,7 @@ export default function DashboardPage() {
                                 <div className="flex flex-col gap-3 p-10 flex-1">
                                     <div className="flex flex-col">
                                         <p className="text-[#4e7397] text-xs font-bold uppercase tracking-widest mb-1">OVERVIEW</p>
-                                        <h1 className="text-[#0e141b] text-4xl font-black">Welcome back, Alex!</h1>
+                                        <h1 className="text-[#0e141b] text-4xl font-black">Welcome back, {userName}!</h1>
                                     </div>
                                     <p className="text-[#4e7397] text-lg font-medium leading-relaxed max-w-2xl">
                                         You've completed 12 practice sessions this month. Your preparation streak is <span className="text-primary font-bold">5 days</span>. Keep the momentum going!

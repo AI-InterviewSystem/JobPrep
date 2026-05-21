@@ -55,6 +55,17 @@ export const cvApi = {
     setCurrent: (id) => api.put(`/cvs/${id}/set-current`),
 };
 
+export const jobDescriptionApi = {
+    list: () => api.get('/job-descriptions'),
+    get: (id) => api.get(`/job-descriptions/${id}`),
+    create: (data) => api.post('/job-descriptions', data),
+    delete: (id) => api.delete(`/job-descriptions/${id}`),
+};
+
+export const jobCategoryApi = {
+    list: () => api.get('/jobs/categories'),
+};
+
 export const adminPricingPlansApi = {
     getAll: () => api.get('/admin/pricing-plans'),
     create: (data) => api.post('/admin/pricing-plans', data),
