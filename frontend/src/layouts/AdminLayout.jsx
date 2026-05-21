@@ -26,6 +26,7 @@ export default function AdminLayout() {
         if (location.pathname.includes('/admin/pricing-plans')) return 'Pricing Plans';
         if (location.pathname.includes('/admin/users')) return 'Users';
         if (location.pathname.includes('/admin/jobs')) return 'Jobs Management';
+        if (location.pathname.includes('/admin/experience-levels')) return 'Experience Levels';
         if (location.pathname.includes('/admin/promos')) return 'Promotions';
         if (location.pathname.includes('/admin/feedbacks')) return 'Feedback Management';
         return 'Dashboard';
@@ -53,6 +54,10 @@ export default function AdminLayout() {
                         <Link to="/admin/jobs" className={`flex items-center gap-4 px-4 py-3 rounded-2xl font-medium transition-transform ${location.pathname.includes('/admin/jobs') ? 'bg-primary text-white shadow-md shadow-primary/30 hover:scale-105' : 'text-gray-500 hover:bg-slate-100 hover:text-gray-900'}`}>
                             <FiBriefcase className="text-lg" />
                             Jobs
+                        </Link>
+                        <Link to="/admin/experience-levels" className={`flex items-center gap-4 px-4 py-3 rounded-2xl font-medium transition-transform ${location.pathname.includes('/admin/experience-levels') ? 'bg-primary text-white shadow-md shadow-primary/30 hover:scale-105' : 'text-gray-500 hover:bg-slate-100 hover:text-gray-900'}`}>
+                            <FiBriefcase className="text-lg" />
+                            Exp Levels
                         </Link>
                         <Link to="/admin/promos" className={`flex items-center gap-4 px-4 py-3 rounded-2xl font-medium transition-transform ${location.pathname.includes('/admin/promos') ? 'bg-primary text-white shadow-md shadow-primary/30 hover:scale-105' : 'text-gray-500 hover:bg-slate-100 hover:text-gray-900'}`}>
                             <FiTag className="text-lg" />

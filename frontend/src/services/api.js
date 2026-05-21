@@ -62,6 +62,10 @@ export const jobDescriptionApi = {
     delete: (id) => api.delete(`/job-descriptions/${id}`),
 };
 
+export const experienceLevelsApi = {
+    getActive: () => api.get('/experience-levels'),
+};
+
 export const jobCategoryApi = {
     list: () => api.get('/jobs/categories'),
 };
@@ -106,6 +110,13 @@ export const adminPromosApi = {
     create: (data) => api.post('/admin/promos', data),
     update: (id, data) => api.put(`/admin/promos/${id}`, data),
     delete: (id) => api.delete(`/admin/promos/${id}`),
+};
+
+export const adminExperienceLevelsApi = {
+    getAll: () => api.get('/admin/experience-levels'),
+    create: (data) => api.post('/admin/experience-levels', data),
+    update: (id, data) => api.put(`/admin/experience-levels/${id}`, data),
+    delete: (id) => api.delete(`/admin/experience-levels/${id}`),
 };
 
 export const publicPricingPlansApi = {
