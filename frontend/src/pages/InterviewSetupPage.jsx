@@ -1,16 +1,8 @@
 import { Link, useNavigate } from "react-router-dom"
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { cvApi, jobDescriptionApi, jobGroupApi } from "../services/api"
+import { cvApi, jobDescriptionApi, jobGroupApi, experienceLevelsApi } from "../services/api"
 import logo from "../assets/images/jobprep-logo.png"
-
-
-
-const experienceLevels = [
-    { label: "Intern", desc: "Still in university or recent grad" },
-    { label: "Fresher", desc: "0-1 years of experience" },
-    { label: "Junior", desc: "1-3 years of experience" },
-]
 
 const interviewTypes = [
     {
@@ -61,6 +53,7 @@ export default function InterviewSetupPage() {
 
     // Job Group / Category / Role 3-level state
     const [groups, setGroups] = useState([])
+    const [experienceLevels, setExperienceLevels] = useState([])
     const [loadingGroups, setLoadingGroups] = useState(true)
     const [selectedGroup, setSelectedGroup] = useState(null)
     const [selectedCategory, setSelectedCategory] = useState(null)
@@ -72,7 +65,20 @@ export default function InterviewSetupPage() {
     useEffect(() => {
         fetchCvs()
         fetchGroups()
+        fetchExperienceLevels()
     }, [])
+
+    const fetchExperienceLevels = async () => {
+        try {
+            const res = await experienceLevelsApi.getActive()
+            setExperienceLevels(res.data)
+            if (res.data.length > 0) {
+                setSelectedLevel(res.data[0].name)
+            }
+        } catch (err) {
+            console.error("Failed to fetch experience levels", err)
+        }
+    }
 
     const fetchGroups = async () => {
         try {
@@ -686,20 +692,20 @@ export default function InterviewSetupPage() {
                             <h2 className="font-bold text-gray-900 text-lg">Experience Level</h2>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            {experienceLevels.map(({ label, desc }, index) => (
+                            {experienceLevels.map((level, index) => (
                                 <motion.button
-                                    key={label}
+                                    key={level.name}
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ duration: 0.4, delay: index * 0.1 }}
                                     whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                                    onClick={() => setSelectedLevel(label)}
-                                    className={`relative text-left p-4 rounded-xl border-2 transition-all ${selectedLevel === label
+                                    onClick={() => setSelectedLevel(level.name)}
+                                    className={`relative text-left p-4 rounded-xl border-2 transition-all ${selectedLevel === level.name
                                         ? "border-primary bg-blue-50"
                                         : "border-gray-100 bg-gray-50 hover:border-primary/40"
                                         }`}
                                 >
-                                    {selectedLevel === label && (
+                                    {selectedLevel === level.name && (
                                         <motion.div
                                             initial={{ scale: 0 }}
                                             animate={{ scale: 1 }}
@@ -713,8 +719,10 @@ export default function InterviewSetupPage() {
                                             </svg>
                                         </motion.div>
                                     )}
-                                    <p className="font-bold text-gray-900 text-sm mb-1">{label}</p>
-                                    <p className="text-xs text-gray-400">{desc}</p>
+                                    <p className="font-bold text-gray-900 text-sm mb-1">{level.name}</p>
+                                    <p className="text-xs text-gray-400">
+                                        {level.description || `${level.minYears != null ? level.minYears : 0}-${level.maxYears != null ? level.maxYears : 'Any'} years`}
+                                    </p>
                                 </motion.button>
                             ))}
                         </div>
