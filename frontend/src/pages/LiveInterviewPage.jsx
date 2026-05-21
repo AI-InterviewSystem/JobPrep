@@ -1,28 +1,198 @@
-import { useNavigate } from "react-router-dom"
-import { useState, useEffect } from "react"
+import { useNavigate, useLocation } from "react-router-dom"
+import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import logo from "../assets/images/jobprep-logo.png"
+import { interviewSessionApi, profileApi } from "../services/api"
 
-const TOTAL_QUESTIONS = 10
-const INITIAL_QUESTION = 4
+const DEFAULT_TOTAL_QUESTIONS = 10
+const INITIAL_QUESTION = 1
 
-const currentQuestion = `"Can you describe a challenging project you've worked on recently and specifically how you handled the communication with difficult stakeholders?"`
+const defaultQuestion = `"Can you describe a challenging project you've worked on recently and specifically how you handled the communication with difficult stakeholders?"`
 const aiMessage = `AI: "Thank you for that background. Now, regarding your experience..."`
 
 export default function LiveInterviewPage() {
     const navigate = useNavigate()
-    const [questionNum, setQuestionNum] = useState(INITIAL_QUESTION)
-    const [seconds, setSeconds] = useState(338) // 5:38
-    const [isPaused, setIsPaused] = useState(false)
-    const [sessionSecondsLeft, setSessionSecondsLeft] = useState(14 * 60 + 22) // 14:22
+    const location = useLocation()
+    const videoRef = useRef(null)
 
-    // Countdown timers
+    const [sessionId, setSessionId] = useState(null)
+    const [session, setSession] = useState(null)
+    // Permission UI state (may be used later for error display / placeholders)
+    const [permissionsGranted, setPermissionsGranted] = useState(false)
+    const [permissionLoading, setPermissionLoading] = useState(false)
+    const [permissionError, setPermissionError] = useState("")
+
+    const [sessionStarted, setSessionStarted] = useState(false)
+    const [currentTranscript, setCurrentTranscript] = useState("")
+    const [isRecording, setIsRecording] = useState(false)
+    const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false)
+    const [supportSpeechRecognition, setSupportSpeechRecognition] = useState(true)
+    const [recordingError, setRecordingError] = useState("")
+
+    const [mediaStream, setMediaStream] = useState(null)
+    const [questionNum, setQuestionNum] = useState(INITIAL_QUESTION)
+    const [seconds, setSeconds] = useState(0)
+    const [isPaused, setIsPaused] = useState(false)
+    const [sessionSecondsLeft, setSessionSecondsLeft] = useState(14 * 60 + 22)
+
+    const mediaRecorderRef = useRef(null)
+    const audioChunksRef = useRef([])
+    const recognitionRef = useRef(null)
+    const transcriptRef = useRef("")
+    const questionStartTimeRef = useRef(null)
+
     useEffect(() => {
-        if (isPaused) return
-        const t1 = setInterval(() => setSeconds(s => s + 1), 1000)
-        const t2 = setInterval(() => setSessionSecondsLeft(s => Math.max(0, s - 1)), 1000)
-        return () => { clearInterval(t1); clearInterval(t2) }
-    }, [isPaused])
+        const loadSession = async () => {
+            const params = new URLSearchParams(location.search)
+            const urlSessionId = params.get("sessionId")
+            if (urlSessionId) {
+                setSessionId(urlSessionId)
+                return
+            }
+
+            const stored = localStorage.getItem("interview_setup")
+            if (stored) {
+                try {
+                    const parsed = JSON.parse(stored)
+                    if (parsed?.sessionId) {
+                        setSessionId(parsed.sessionId)
+                        return
+                    }
+                } catch {
+                    // ignore malformed local storage data
+                }
+            }
+
+            try {
+                const createRes = await interviewSessionApi.create({ jobDescriptionId: null })
+                setSessionId(createRes.data.id)
+                localStorage.setItem("interview_setup", JSON.stringify({ sessionId: createRes.data.id }))
+            } catch (err) {
+                console.error("Unable to create interview session", err)
+                setPermissionError("Unable to create the interview session. Please refresh and try again.")
+            }
+        }
+
+        loadSession()
+    }, [location.search])
+
+    useEffect(() => {
+        if (!sessionStarted || isPaused) return
+
+        const t1 = setInterval(() => setSeconds((prev) => prev + 1), 1000)
+        const t2 = setInterval(() => setSessionSecondsLeft((prev) => Math.max(0, prev - 1)), 1000)
+        return () => {
+            clearInterval(t1)
+            clearInterval(t2)
+        }
+    }, [isPaused, sessionStarted])
+
+    useEffect(() => {
+        if (videoRef.current && mediaStream) {
+            videoRef.current.srcObject = mediaStream
+        }
+    }, [mediaStream])
+
+    useEffect(() => {
+        if (!sessionId) return
+        requestMediaPermissions()
+    }, [sessionId])
+
+    useEffect(() => {
+        if (!sessionStarted || !mediaStream) return
+
+        if (!window.MediaRecorder) {
+            setRecordingError("Your browser does not support audio recording for this interview.")
+            return
+        }
+
+        try {
+            const recorder = new MediaRecorder(mediaStream, { mimeType: "audio/webm" })
+            recorder.ondataavailable = (event) => {
+                if (event.data && event.data.size > 0) {
+                    audioChunksRef.current.push(event.data)
+                }
+            }
+            recorder.onerror = (event) => {
+                console.error("MediaRecorder error", event)
+                setRecordingError("Audio recording failed. Your session will continue without a saved audio file.")
+            }
+
+            mediaRecorderRef.current = recorder
+            audioChunksRef.current = []
+            setRecordingError("")
+            startQuestionCapture()
+        } catch (err) {
+            console.error("Failed to initialize audio recorder", err)
+            setRecordingError("Unable to initialize the interview recorder.")
+        }
+
+        return () => {
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+                mediaRecorderRef.current.stop()
+            }
+            mediaRecorderRef.current = null
+            audioChunksRef.current = []
+        }
+    }, [sessionStarted, mediaStream])
+
+    useEffect(() => {
+        if (!sessionStarted) return
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+        if (!SpeechRecognition) {
+            setSupportSpeechRecognition(false)
+            return
+        }
+
+        setSupportSpeechRecognition(true)
+        const recognition = new SpeechRecognition()
+        recognition.continuous = true
+        recognition.interimResults = true
+        recognition.lang = "en-US"
+
+        recognition.onresult = (event) => {
+            let interimTranscript = ""
+            let finalTranscript = transcriptRef.current
+            for (let i = event.resultIndex; i < event.results.length; i += 1) {
+                const result = event.results[i]
+                const transcript = result[0].transcript
+                if (result.isFinal) {
+                    finalTranscript += transcript + " "
+                } else {
+                    interimTranscript += transcript
+                }
+            }
+            transcriptRef.current = finalTranscript
+            setCurrentTranscript(finalTranscript + interimTranscript)
+        }
+
+        recognition.onerror = (event) => {
+            console.error("SpeechRecognition error", event)
+        }
+
+        recognition.onend = () => {
+            if (sessionStarted) {
+                recognition.start()
+            }
+        }
+
+        recognition.start()
+        recognitionRef.current = recognition
+
+        return () => {
+            recognition.onend = null
+            recognition.stop()
+            recognitionRef.current = null
+        }
+    }, [sessionStarted])
+
+    useEffect(() => {
+        return () => {
+            if (mediaStream) {
+                mediaStream.getTracks().forEach((track) => track.stop())
+            }
+        }
+    }, [mediaStream])
 
     const fmt = (secs) => {
         const m = String(Math.floor(secs / 60)).padStart(2, "0")
@@ -30,12 +200,169 @@ export default function LiveInterviewPage() {
         return `${m}:${s}`
     }
 
-    const progressPct = ((questionNum - 1) / TOTAL_QUESTIONS) * 100
+    const currentQuestionText = session?.questions?.[questionNum - 1]?.questionText || defaultQuestion
+    const totalQuestions = session?.questions?.length || DEFAULT_TOTAL_QUESTIONS
+    const progressPct = ((questionNum - 1) / totalQuestions) * 100
 
-    const handleNext = () => {
-        if (questionNum < TOTAL_QUESTIONS) setQuestionNum(q => q + 1)
-        else navigate("/interview-result")
+    const startQuestionCapture = () => {
+        if (!mediaRecorderRef.current || mediaRecorderRef.current.state !== "inactive") return
+
+        audioChunksRef.current = []
+        questionStartTimeRef.current = Date.now()
+
+        try {
+            mediaRecorderRef.current.start()
+            setIsRecording(true)
+        } catch (err) {
+            console.error("Failed to start recording", err)
+            setRecordingError("Unable to start audio capture for the current response.")
+        }
     }
+
+    const stopQuestionCapture = () => {
+        return new Promise((resolve) => {
+            if (!mediaRecorderRef.current || mediaRecorderRef.current.state === "inactive") {
+                return resolve(null)
+            }
+
+            const recorder = mediaRecorderRef.current
+            recorder.onstop = () => {
+                const blob = new Blob(audioChunksRef.current, { type: audioChunksRef.current[0]?.type || "audio/webm" })
+                setIsRecording(false)
+                resolve(blob)
+            }
+            recorder.stop()
+        })
+    }
+
+    const getCurrentQuestionDuration = () => {
+        if (!questionStartTimeRef.current) return 0
+        return Math.max(0, Math.round((Date.now() - questionStartTimeRef.current) / 1000))
+    }
+
+    const uploadAudioBlob = async (blob, questionId) => {
+        if (!blob || blob.size === 0) return null
+
+        const file = new File([blob], `interview-answer-${questionId}.webm`, { type: blob.type || "audio/webm" })
+
+        try {
+            const uploadRes = await profileApi.uploadFile(file)
+            return uploadRes.data.url
+        } catch (err) {
+            console.error("Audio upload failed", err)
+            setRecordingError("Unable to save the answer audio file at this time.")
+            return null
+        }
+    }
+
+    const submitCurrentAnswer = async () => {
+        const currentQuestion = session?.questions?.[questionNum - 1]
+        if (!currentQuestion) return
+
+        setIsSubmittingAnswer(true)
+        setRecordingError("")
+
+        const audioBlob = await stopQuestionCapture()
+        const audioStoragePath = await uploadAudioBlob(audioBlob, currentQuestion.id)
+        const answerData = {
+            questionId: currentQuestion.id,
+            answerText: currentTranscript || "",
+            inputType: audioStoragePath ? "AUDIO" : "TEXT",
+            durationSeconds: getCurrentQuestionDuration(),
+            audioStoragePath,
+        }
+
+        try {
+            await interviewSessionApi.submitAnswer(sessionId, answerData)
+            transcriptRef.current = ""
+            setCurrentTranscript("")
+        } catch (err) {
+            console.error("Failed to submit answer", err)
+            setPermissionError("Unable to save your answer. Please try again.")
+        } finally {
+            setIsSubmittingAnswer(false)
+        }
+    }
+
+    const completeInterviewSession = async () => {
+        try {
+            await interviewSessionApi.complete(sessionId)
+            localStorage.removeItem("interview_setup")
+            navigate("/interview-result")
+        } catch (err) {
+            console.error("Failed to complete interview session", err)
+            setPermissionError("Unable to finish the interview. Please try again.")
+        }
+    }
+
+    const handleNext = async () => {
+        if (isSubmittingAnswer) return
+
+        await submitCurrentAnswer()
+
+        if (questionNum < totalQuestions) {
+            transcriptRef.current = ""
+            setQuestionNum((q) => q + 1)
+            startQuestionCapture()
+        } else {
+            await completeInterviewSession()
+        }
+    }
+
+    const handleEndInterview = async () => {
+        if (isSubmittingAnswer) return
+
+        await submitCurrentAnswer()
+        await completeInterviewSession()
+    }
+
+    const startInterviewSession = async (id) => {
+        try {
+            const startRes = await interviewSessionApi.start(id)
+            setSession(startRes.data)
+            setSessionStarted(true)
+            setPermissionError("")
+        } catch (err) {
+            console.error("Failed to start interview session", err)
+            setPermissionError("Unable to start the interview session. Please refresh and try again.")
+        }
+    }
+
+    const requestMediaPermissions = async () => {
+        // Auto called on page load; permission UI state is used for error display below.
+        // This function is intentionally kept stable to avoid re-creating streams.
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            setPermissionError("Your browser does not support camera and microphone access.")
+            return
+        }
+
+        if (!sessionId) {
+            setPermissionError("No active interview session found. Please start again from the setup page.")
+            return
+        }
+
+        setPermissionLoading(true)
+        setPermissionError("")
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+            setMediaStream(stream)
+            setPermissionsGranted(true)
+            await startInterviewSession(sessionId)
+        } catch (err) {
+            console.error("Media permission request failed", err)
+            if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+                setPermissionError("Camera and microphone permission are required. Please allow access in your browser settings.")
+            } else {
+                setPermissionError("Unable to access camera and microphone. Please check your device and try again.")
+            }
+        } finally {
+            setPermissionLoading(false)
+        }
+    }
+
+
 
     return (
         <div className="min-h-screen bg-gray-50 font-display flex flex-col">
@@ -48,7 +375,16 @@ export default function LiveInterviewPage() {
                             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            Session Ends: <span className="font-bold text-gray-900">{fmt(sessionSecondsLeft)}</span>
+                            AI Interviewer Live
+                            <span className="ml-2 inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-green-700">
+                                Active
+                            </span>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 text-sm text-gray-600 font-medium bg-gray-50 px-3 py-1.5 rounded-lg">
+                            <span>Session Ends:</span>
+                            <span className="font-bold text-gray-900">{fmt(sessionSecondsLeft)}</span>
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -68,26 +404,28 @@ export default function LiveInterviewPage() {
                 <div className="grid lg:grid-cols-5 gap-6">
                     {/* Left - AI Interviewer Video + Transcription */}
                     <div className="lg:col-span-3 space-y-5">
-                        {/* AI Video feed */}
+                        {/* AI Video feed (interviewer camera) */}
                         <div className="relative rounded-2xl overflow-hidden bg-gray-800 aspect-video">
-                            <div className="absolute inset-0 flex items-center justify-center"
-                                style={{ background: "linear-gradient(160deg,#1a1a2e,#16213e,#0f3460)" }}>
-                                {/* AI Interviewer avatar placeholder */}
-                                <div className="flex flex-col items-center gap-4">
-                                    <div className="w-32 h-32 rounded-full bg-gradient-to-br from-gray-600 to-gray-400 flex items-center justify-center text-6xl">
-                                        🧑‍💼
-                                    </div>
-                                    <div className="flex gap-1">
-                                        {[1, 2, 3, 4, 5].map(i => (
-                                            <div
-                                                key={i}
-                                                className="w-1 bg-blue-400 rounded-full animate-pulse"
-                                                style={{ height: `${8 + Math.random() * 24}px`, animationDelay: `${i * 0.1}s` }}
-                                            />
-                                        ))}
-                                    </div>
+                            <video
+                                ref={videoRef}
+                                autoPlay
+                                muted
+                                playsInline
+                                className="w-full h-full object-cover"
+                            />
+
+                            {(!mediaStream || !permissionsGranted) && (
+                                <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-black/50">
+                                    <p className="text-lg font-semibold">Starting camera...</p>
+                                    {permissionLoading && (
+                                        <p className="text-xs text-gray-200 mt-2">Requesting permission</p>
+                                    )}
+                                    {permissionError && (
+                                        <p className="text-xs text-red-200 mt-2">{permissionError}</p>
+                                    )}
                                 </div>
-                            </div>
+                            )}
+
                             <div className="absolute bottom-4 left-4 flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse inline-block"></span>
                                 <span className="text-white text-xs font-semibold uppercase tracking-widest">AI Interviewer Live</span>
@@ -118,13 +456,28 @@ export default function LiveInterviewPage() {
                             </AnimatePresence>
                             <div className="border-l-4 border-primary pl-4 py-1">
                                 <motion.p
-                                    key={currentQuestion}
+                                    key={currentQuestionText}
                                     initial={{ opacity: 0, x: -10 }}
                                     animate={{ opacity: 1, x: 0 }}
                                     className="text-gray-700 text-sm leading-relaxed font-medium"
                                 >
-                                    {currentQuestion}
+                                    {currentQuestionText}
                                 </motion.p>
+                            </div>
+                            <div className="mt-5 rounded-2xl border border-gray-100 bg-slate-50 p-4">
+                                <div className="flex items-center justify-between mb-3 text-xs text-gray-500">
+                                    <span>Your live answer transcript</span>
+                                    <span>{isRecording ? "Recording audio..." : "Listening..."}</span>
+                                </div>
+                                <p className="min-h-[5rem] text-gray-700 text-sm leading-relaxed">
+                                    {currentTranscript || "Speak clearly into your microphone. Your answer will appear here as you speak."}
+                                </p>
+                                {recordingError && (
+                                    <p className="mt-3 text-xs text-red-600">{recordingError}</p>
+                                )}
+                                {!supportSpeechRecognition && (
+                                    <p className="mt-3 text-xs text-amber-600">Speech recognition is unavailable in this browser. Audio capture will still save your response if supported.</p>
+                                )}
                             </div>
                         </motion.div>
                     </div>
@@ -136,7 +489,7 @@ export default function LiveInterviewPage() {
                             <div className="flex items-center justify-between mb-2">
                                 <div>
                                     <p className="text-xs text-gray-400 font-medium">Interview Progress</p>
-                                    <p className="text-xl font-extrabold text-gray-900">Question {questionNum} of {TOTAL_QUESTIONS}</p>
+                                    <p className="text-xl font-extrabold text-gray-900">Question {questionNum} of {totalQuestions}</p>
                                 </div>
                                 <div className="text-right">
                                     <p className="text-xs text-gray-400 font-medium">Time Elapsed</p>
@@ -160,8 +513,8 @@ export default function LiveInterviewPage() {
                                 <span className="text-2xl">👤</span>
                             </div>
                             <div className="text-center">
-                                <p className="font-bold text-sm">Your Mic is Active</p>
-                                <p className="text-blue-200 text-xs">AI is listening to your response...</p>
+                                <p className="font-bold text-sm">AI Video</p>
+                                <p className="text-blue-200 text-xs">Interviewer camera feed is active...</p>
                             </div>
                             <div className="flex gap-1 mt-1">
                                 {[3, 6, 9, 5, 7, 4, 8, 6, 3].map((h, i) => (
@@ -197,8 +550,9 @@ export default function LiveInterviewPage() {
                                 )}
                             </button>
                             <button
-                                onClick={() => navigate("/interview-result")}
-                                className="flex-1 flex items-center justify-center gap-2 bg-red-500 text-white py-3.5 rounded-xl font-semibold hover:bg-red-600 transition-all"
+                                onClick={handleEndInterview}
+                                disabled={isSubmittingAnswer}
+                                className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl font-semibold transition-all ${isSubmittingAnswer ? 'bg-red-300 text-white cursor-not-allowed' : 'bg-red-500 text-white hover:bg-red-600'}`}
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -209,7 +563,8 @@ export default function LiveInterviewPage() {
 
                         <button
                             onClick={handleNext}
-                            className="w-full flex items-center justify-center gap-2 bg-primary text-white py-3.5 rounded-xl font-bold hover:bg-primary-dark transition-all"
+                            disabled={isSubmittingAnswer}
+                            className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold transition-all ${isSubmittingAnswer ? 'bg-primary/50 cursor-not-allowed' : 'bg-primary text-white hover:bg-primary-dark'}`}
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
@@ -230,32 +585,6 @@ export default function LiveInterviewPage() {
                     </div>
                 </div>
             </main>
-
-            {/* Status Bar */}
-            <div className="border-t border-gray-100 bg-white py-3 px-6">
-                <div className="max-w-7xl mx-auto flex items-center justify-between text-xs font-semibold">
-                    <div className="flex items-center gap-6">
-                        <span className="flex items-center gap-1.5 text-green-500">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
-                            </svg>
-                            CONNECTION: EXCELLENT
-                        </span>
-                        <span className="flex items-center gap-1.5 text-gray-500">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 016 0v6a3 3 0 01-3 3z" />
-                            </svg>
-                            INPUT: DEFAULT MACBOOK PRO
-                        </span>
-                    </div>
-                    <span className="flex items-center gap-1.5 text-primary">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 016 0v6a3 3 0 01-3 3z" />
-                        </svg>
-                        VOICE INTELLIGENCE: ACTIVE
-                    </span>
-                </div>
-            </div>
         </div>
     )
 }

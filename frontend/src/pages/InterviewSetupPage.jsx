@@ -1,8 +1,16 @@
 import { Link, useNavigate } from "react-router-dom"
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { cvApi, jobDescriptionApi, jobGroupApi, experienceLevelsApi } from "../services/api"
+import { cvApi, interviewSessionApi, jobDescriptionApi, jobGroupApi } from "../services/api"
 import logo from "../assets/images/jobprep-logo.png"
+
+
+
+const experienceLevels = [
+    { label: "Intern", desc: "Still in university or recent grad" },
+    { label: "Fresher", desc: "0-1 years of experience" },
+    { label: "Junior", desc: "1-3 years of experience" },
+]
 
 const interviewTypes = [
     {
@@ -36,11 +44,9 @@ const interviewTypes = [
 
 export default function InterviewSetupPage() {
     const navigate = useNavigate()
-    const [selectedIndustry, setSelectedIndustry] = useState("Software Engineering")
     const [selectedLevel, setSelectedLevel] = useState("Intern")
     const [selectedType, setSelectedType] = useState("Technical")
 
-    // CV Upload State
     const [cvs, setCvs] = useState([])
     const [loadingCvs, setLoadingCvs] = useState(true)
     const [isScanning, setIsScanning] = useState(false)
@@ -51,9 +57,7 @@ export default function InterviewSetupPage() {
     const [jobDescription, setJobDescription] = useState("")
     const fileInputRef = useRef(null)
 
-    // Job Group / Category / Role 3-level state
     const [groups, setGroups] = useState([])
-    const [experienceLevels, setExperienceLevels] = useState([])
     const [loadingGroups, setLoadingGroups] = useState(true)
     const [selectedGroup, setSelectedGroup] = useState(null)
     const [selectedCategory, setSelectedCategory] = useState(null)
@@ -61,24 +65,13 @@ export default function InterviewSetupPage() {
     const [keyRequirements, setKeyRequirements] = useState([])
     const [newRequirement, setNewRequirement] = useState("")
     const [isAnalyzingJD, setIsAnalyzingJD] = useState(false)
+    const [isStartingInterview, setIsStartingInterview] = useState(false)
+    const [startError, setStartError] = useState("")
 
     useEffect(() => {
         fetchCvs()
         fetchGroups()
-        fetchExperienceLevels()
     }, [])
-
-    const fetchExperienceLevels = async () => {
-        try {
-            const res = await experienceLevelsApi.getActive()
-            setExperienceLevels(res.data)
-            if (res.data.length > 0) {
-                setSelectedLevel(res.data[0].name)
-            }
-        } catch (err) {
-            console.error("Failed to fetch experience levels", err)
-        }
-    }
 
     const fetchGroups = async () => {
         try {
@@ -163,12 +156,13 @@ export default function InterviewSetupPage() {
     }
 
     const handleStartInterview = async () => {
+        setIsStartingInterview(true)
+        setStartError("")
+
         let finalJdId = null
-        
-        if (jobDescription.trim().length > 0) {
-            try {
+        try {
+            if (jobDescription.trim().length > 0) {
                 const jobCategoryId = selectedCategory ? selectedCategory.id : null
-                
                 const res = await jobDescriptionApi.create({
                     jobCategoryId,
                     jobDescriptionText: jobDescription,
@@ -176,25 +170,33 @@ export default function InterviewSetupPage() {
                     isPublic: false
                 })
                 finalJdId = res.data.id
-            } catch (err) {
-                console.error("Failed to save job description to database", err)
             }
-        }
 
-        const setupState = {
-            jobDescription,
-            selectedGroup: selectedGroup?.name || "",
-            selectedCategory: selectedCategory?.name || "",
-            selectedRole: selectedRole?.name || "",
-            selectedIndustry: selectedCategory?.name || selectedGroup?.name || "",
-            selectedLevel,
-            selectedType,
-            keyRequirements,
-            jdId: finalJdId
-        }
-        localStorage.setItem("interview_setup", JSON.stringify(setupState))
+            const createSessionRes = await interviewSessionApi.create({
+                jobDescriptionId: finalJdId,
+            })
 
-        navigate("/live-interview")
+            const setupState = {
+                sessionId: createSessionRes.data.id,
+                sessionStatus: createSessionRes.data.status,
+                jobDescription,
+                selectedGroup: selectedGroup?.name || "",
+                selectedCategory: selectedCategory?.name || "",
+                selectedRole: selectedRole?.name || "",
+                selectedIndustry: selectedCategory?.name || selectedGroup?.name || "",
+                selectedLevel,
+                selectedType,
+                keyRequirements,
+                jdId: finalJdId
+            }
+            localStorage.setItem("interview_setup", JSON.stringify(setupState))
+            navigate(`/live-interview?sessionId=${createSessionRes.data.id}`)
+        } catch (err) {
+            console.error("Failed to start interview session", err)
+            setStartError("Unable to start the interview. Please try again or check your connection.")
+        } finally {
+            setIsStartingInterview(false)
+        }
     }
 
     const fetchCvs = async () => {
@@ -302,7 +304,7 @@ export default function InterviewSetupPage() {
                     <div className="flex justify-between items-end mb-2">
                         <div>
                             <h1 className="text-4xl font-extrabold text-gray-900 mb-2">Interview Setup</h1>
-                            <p className="text-gray-500">Configure your mock interview session to get started.</p>
+                            <p className="text-gray-500">Configure your mock interview session to get started</p>
                         </div>
                         {isAutoSelected && (
                             <motion.div
@@ -475,11 +477,9 @@ export default function InterviewSetupPage() {
                     {/* Job Description Section */}
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
                         <div className="flex items-center gap-2 mb-5">
-                            <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center text-orange-500">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                 </svg>
-                            </div>
                             <h2 className="font-bold text-gray-900 text-lg">Job Description</h2>
                         </div>
                         <div className="space-y-3">
@@ -507,7 +507,7 @@ export default function InterviewSetupPage() {
                                                     Analyzing...
                                                 </>
                                             ) : (
-                                                <>🔮 Extract AI Tags</>
+                                                <>Extract AI Tags</>
                                             )}
                                         </button>
                                     )}
@@ -692,20 +692,20 @@ export default function InterviewSetupPage() {
                             <h2 className="font-bold text-gray-900 text-lg">Experience Level</h2>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            {experienceLevels.map((level, index) => (
+                            {experienceLevels.map(({ label, desc }, index) => (
                                 <motion.button
-                                    key={level.name}
+                                    key={label}
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ duration: 0.4, delay: index * 0.1 }}
                                     whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                                    onClick={() => setSelectedLevel(level.name)}
-                                    className={`relative text-left p-4 rounded-xl border-2 transition-all ${selectedLevel === level.name
+                                    onClick={() => setSelectedLevel(label)}
+                                    className={`relative text-left p-4 rounded-xl border-2 transition-all ${selectedLevel === label
                                         ? "border-primary bg-blue-50"
                                         : "border-gray-100 bg-gray-50 hover:border-primary/40"
                                         }`}
                                 >
-                                    {selectedLevel === level.name && (
+                                    {selectedLevel === label && (
                                         <motion.div
                                             initial={{ scale: 0 }}
                                             animate={{ scale: 1 }}
@@ -719,10 +719,8 @@ export default function InterviewSetupPage() {
                                             </svg>
                                         </motion.div>
                                     )}
-                                    <p className="font-bold text-gray-900 text-sm mb-1">{level.name}</p>
-                                    <p className="text-xs text-gray-400">
-                                        {level.description || `${level.minYears != null ? level.minYears : 0}-${level.maxYears != null ? level.maxYears : 'Any'} years`}
-                                    </p>
+                                    <p className="font-bold text-gray-900 text-sm mb-1">{label}</p>
+                                    <p className="text-xs text-gray-400">{desc}</p>
                                 </motion.button>
                             ))}
                         </div>
@@ -783,11 +781,17 @@ export default function InterviewSetupPage() {
                         </svg>
                         Estimated duration: 30-45 minutes
                     </div>
+                    {startError && (
+                        <div className="w-full rounded-2xl bg-red-50 border border-red-100 text-red-700 px-4 py-3 text-sm text-center mb-3">
+                            {startError}
+                        </div>
+                    )}
                     <button
                         onClick={handleStartInterview}
-                        className="flex items-center gap-3 bg-primary text-white px-12 py-4 rounded-2xl font-bold hover:bg-primary-dark transition-all hover:shadow-lg text-base"
+                        disabled={isStartingInterview}
+                        className={`flex items-center gap-3 px-12 py-4 rounded-2xl font-bold text-base transition-all ${isStartingInterview ? "bg-gray-300 text-gray-700 cursor-not-allowed" : "bg-primary text-white hover:bg-primary-dark hover:shadow-lg"}`}
                     >
-                        Start Interview
+                        {isStartingInterview ? "Starting Interview..." : "Start Interview"}
                         <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                         </svg>

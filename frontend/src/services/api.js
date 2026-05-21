@@ -147,4 +147,15 @@ export const adminFeedbackApi = {
     getHistory: (id) => api.get(`/admin/feedbacks/${id}/history`),
 };
 
+export const interviewSessionApi = {
+    create: (data) => api.post('/interview-sessions', data),
+    get: (id) => api.get(`/interview-sessions/${id}`),
+    list: () => api.get('/interview-sessions'),
+    start: (id) => api.post(`/interview-sessions/${id}/start`),
+    submitAnswer: (id, data) => api.post(`/interview-sessions/${id}/answers`, data),
+    complete: (id) => api.post(`/interview-sessions/${id}/complete`),
+    delete: (id) => api.delete(`/interview-sessions/${id}`),
+};
+
 export default api;
+
