@@ -25,6 +25,7 @@ export default function AdminUsersPage() {
 
     // Ban modal state
     const [banModal, setBanModal] = useState({ open: false, user: null });
+    const [unbanModal, setUnbanModal] = useState({ open: false, user: null });
     const [banReason, setBanReason] = useState('');
     const [actionLoading, setActionLoading] = useState(false);
 
@@ -86,14 +87,21 @@ export default function AdminUsersPage() {
         }
     };
 
-    const handleUnban = async (user) => {
-        if (!window.confirm(`Unban ${user.email}?`)) return;
+    const openUnbanModal = (user) => setUnbanModal({ open: true, user });
+    const closeUnbanModal = () => setUnbanModal({ open: false, user: null });
+
+    const handleUnban = async () => {
+        if (!unbanModal.user) return;
+        setActionLoading(true);
         try {
-            await adminUsersApi.unbanUser(user.id);
-            toast.success(`Unblocked ${user.email}`);
+            await adminUsersApi.unbanUser(unbanModal.user.id);
+            toast.success(`Unblocked ${unbanModal.user.email}`);
+            closeUnbanModal();
             fetchUsers();
         } catch (err) {
             toast.error(err?.response?.data?.message || 'Failed to unban user');
+        } finally {
+            setActionLoading(false);
         }
     };
 
@@ -256,7 +264,7 @@ export default function AdminUsersPage() {
                                                 {user.isBanned ? (
                                                     <button
                                                         id={`unban-btn-${user.id}`}
-                                                        onClick={() => handleUnban(user)}
+                                                        onClick={() => openUnbanModal(user)}
                                                         title="Unban user"
                                                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 rounded-xl hover:bg-emerald-100 transition-colors"
                                                     >
@@ -398,6 +406,71 @@ export default function AdminUsersPage() {
                                         <FiLock className="text-sm" />
                                     )}
                                     Confirm Ban
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Unban Confirm Modal */}
+            <AnimatePresence>
+                {unbanModal.open && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="bg-white rounded-2xl w-full max-w-md shadow-2xl"
+                        >
+                            {/* Modal Header */}
+                            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
+                                        <FiUnlock className="text-emerald-500 text-lg" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-black text-gray-900">Unban User</h3>
+                                        <p className="text-xs text-gray-400">{unbanModal.user?.email}</p>
+                                    </div>
+                                </div>
+                                <button onClick={closeUnbanModal} className="text-gray-400 hover:text-gray-600 transition-colors">
+                                    <FiX className="text-xl" />
+                                </button>
+                            </div>
+
+                            {/* Modal Body */}
+                            <div className="p-6">
+                                <p className="text-sm text-gray-600">
+                                    Are you sure you want to unban <strong>{unbanModal.user?.email}</strong>? They will be able to log in and use the system again.
+                                </p>
+                            </div>
+
+                            {/* Modal Footer */}
+                            <div className="p-6 pt-0 flex justify-end gap-3">
+                                <button
+                                    onClick={closeUnbanModal}
+                                    className="px-5 py-2.5 border border-gray-200 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    id="confirm-unban-btn"
+                                    onClick={handleUnban}
+                                    disabled={actionLoading}
+                                    className="px-5 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-bold hover:bg-emerald-600 transition-colors disabled:opacity-60 flex items-center gap-2"
+                                >
+                                    {actionLoading ? (
+                                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    ) : (
+                                        <FiUnlock className="text-sm" />
+                                    )}
+                                    Confirm Unban
                                 </button>
                             </div>
                         </motion.div>

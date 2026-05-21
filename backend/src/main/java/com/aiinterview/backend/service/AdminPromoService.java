@@ -8,6 +8,10 @@ import com.aiinterview.backend.repository.PromoCodeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import com.aiinterview.backend.entity.AdminAction;
+import com.aiinterview.backend.repository.AdminActionRepository;
 
 import java.util.List;
 import java.util.UUID;
@@ -18,6 +22,28 @@ import java.util.stream.Collectors;
 public class AdminPromoService {
 
     private final PromoCodeRepository promoCodeRepository;
+    private final AdminActionRepository adminActionRepository;
+    private final com.aiinterview.backend.repository.UserRepository userRepository;
+
+    private void logAdminAction(String actionType, String reason) {
+        String adminEmail = "system";
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated()) {
+            adminEmail = auth.getName();
+        }
+        try {
+            userRepository.findByEmail(adminEmail).ifPresent(admin -> {
+                AdminAction action = AdminAction.builder()
+                        .adminUser(admin)
+                        .actionType(actionType)
+                        .reason(reason)
+                        .build();
+                adminActionRepository.save(action);
+            });
+        } catch (Exception e) {
+            // Ignore logging errors
+        }
+    }
 
     @Transactional(readOnly = true)
     public List<AdminPromoResponse> getAllPromos() {
@@ -44,7 +70,9 @@ public class AdminPromoService {
                 .expiresAt(request.getExpiresAt())
                 .build();
 
-        return mapToResponse(promoCodeRepository.save(promoCode));
+        PromoCode saved = promoCodeRepository.save(promoCode);
+        logAdminAction("CREATE_PROMO_CODE", "Created promo code: " + saved.getCode());
+        return mapToResponse(saved);
     }
 
     @Transactional
@@ -69,15 +97,18 @@ public class AdminPromoService {
         promoCode.setStartsAt(request.getStartsAt());
         promoCode.setExpiresAt(request.getExpiresAt());
 
-        return mapToResponse(promoCodeRepository.save(promoCode));
+        PromoCode saved = promoCodeRepository.save(promoCode);
+        logAdminAction("UPDATE_PROMO_CODE", "Updated promo code: " + saved.getCode());
+        return mapToResponse(saved);
     }
 
     @Transactional
     public void deletePromo(UUID id) {
-        if (!promoCodeRepository.existsById(id)) {
-            throw new AppException("Promo code not found");
-        }
-        promoCodeRepository.deleteById(id);
+        PromoCode promo = promoCodeRepository.findById(id)
+                .orElseThrow(() -> new AppException("Promo code not found"));
+        String code = promo.getCode();
+        promoCodeRepository.delete(promo);
+        logAdminAction("DELETE_PROMO_CODE", "Deleted promo code: " + code);
     }
 
     private AdminPromoResponse mapToResponse(PromoCode promoCode) {
