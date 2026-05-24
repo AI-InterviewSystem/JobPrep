@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "react-router-dom"
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { cvApi, interviewSessionApi, jobDescriptionApi, jobGroupApi, aiHelpersApi } from "../services/api"
+import { cvApi, interviewSessionApi, jobDescriptionApi, aiHelpersApi } from "../services/api"
 import logo from "../assets/images/jobprep-logo.png"
 
 
@@ -10,6 +10,7 @@ const experienceLevels = [
     { label: "Intern", desc: "Still in university or recent grad" },
     { label: "Fresher", desc: "0-1 years of experience" },
     { label: "Junior", desc: "1-3 years of experience" },
+    { label: "Mid", desc: "3-5+ years of experience" },
 ]
 
 const interviewTypes = [
@@ -57,11 +58,6 @@ export default function InterviewSetupPage() {
     const [jobDescription, setJobDescription] = useState("")
     const fileInputRef = useRef(null)
 
-    const [groups, setGroups] = useState([])
-    const [loadingGroups, setLoadingGroups] = useState(true)
-    const [selectedGroup, setSelectedGroup] = useState(null)
-    const [selectedCategory, setSelectedCategory] = useState(null)
-    const [selectedRole, setSelectedRole] = useState(null)
     const [keyRequirements, setKeyRequirements] = useState([])
     const [newRequirement, setNewRequirement] = useState("")
     const [isAnalyzingJD, setIsAnalyzingJD] = useState(false)
@@ -73,26 +69,8 @@ export default function InterviewSetupPage() {
 
     useEffect(() => {
         fetchCvs()
-        fetchGroups()
     }, [])
 
-    const fetchGroups = async () => {
-        try {
-            const res = await jobGroupApi.list()
-            setGroups(res.data)
-            if (res.data.length > 0) {
-                setSelectedGroup(res.data[0])
-            }
-        } catch (err) {
-            console.error("Failed to fetch job groups", err)
-        } finally {
-            setLoadingGroups(false)
-        }
-    }
-
-    // Derived lists from selected group/category
-    const availableCategories = selectedGroup ? selectedGroup.categories || [] : []
-    const availableRoles = selectedCategory ? selectedCategory.roles || [] : []
 
     const handleAIAnalyze = async () => {
         if (!jobDescription || jobDescription.trim().length === 0) return
@@ -120,6 +98,46 @@ export default function InterviewSetupPage() {
             }
             if (tags.length > 0) {
                 setKeyRequirements(tags)
+            }
+
+            // Auto-select Level and Type based on JD analysis
+            if (result.interview_level) {
+                setSelectedLevel(result.interview_level);
+                setIsAutoSelected(true);
+            } else {
+                // Fallback: Infer level from JD text
+                const lowerJd = jobDescription.toLowerCase();
+                if (lowerJd.includes("intern")) {
+                    setSelectedLevel("Intern");
+                    setIsAutoSelected(true);
+                } else if (lowerJd.includes("mid")) {
+                    setSelectedLevel("Mid");
+                    setIsAutoSelected(true);
+                } else if (lowerJd.includes("senior")) {
+                    setSelectedLevel("Senior");
+                    setIsAutoSelected(true);
+                } else if (lowerJd.includes("junior") || lowerJd.includes("fresher")) {
+                    setSelectedLevel("Junior");
+                    setIsAutoSelected(true);
+                }
+            }
+
+            if (result.interview_type) {
+                setSelectedType(result.interview_type);
+                setIsAutoSelected(true);
+            } else {
+                // Fallback: Infer type from JD text
+                const lowerJd = jobDescription.toLowerCase();
+                if (lowerJd.includes("hr") || lowerJd.includes("human resource")) {
+                    setSelectedType("HR Interview");
+                    setIsAutoSelected(true);
+                } else if (lowerJd.includes("behavioral") || lowerJd.includes("soft skill")) {
+                    setSelectedType("Behavioral");
+                    setIsAutoSelected(true);
+                } else if (lowerJd.includes("technical") || lowerJd.includes("engineer") || lowerJd.includes("developer") || lowerJd.includes("coding")) {
+                    setSelectedType("Technical");
+                    setIsAutoSelected(true);
+                }
             }
         } catch (err) {
             console.error("JD analysis failed", err)
@@ -149,7 +167,7 @@ export default function InterviewSetupPage() {
         let finalJdId = null
         try {
             if (jobDescription.trim().length > 0) {
-                const jobCategoryId = selectedCategory ? selectedCategory.id : null
+                const jobCategoryId = null
                 const res = await jobDescriptionApi.create({
                     jobCategoryId,
                     jobDescriptionText: jobDescription,
@@ -172,10 +190,7 @@ export default function InterviewSetupPage() {
                 sessionId: startSessionRes.data.id,
                 sessionStatus: startSessionRes.data.status,
                 jobDescription,
-                selectedGroup: selectedGroup?.name || "",
-                selectedCategory: selectedCategory?.name || "",
-                selectedRole: selectedRole?.name || "",
-                selectedIndustry: selectedCategory?.name || selectedGroup?.name || "",
+                selectedIndustry: "", // Reset industry since job selection is removed
                 selectedLevel,
                 selectedType,
                 keyRequirements,
@@ -232,11 +247,22 @@ export default function InterviewSetupPage() {
             setCvParseStatus(uploadRes.data.parseStatus)
             await fetchCvs()
 
-            if (uploadRes.data.parseStatus === "failed") {
-                setStartError(
-                    uploadRes.data.parseError ||
-                    "CV uploaded but AI parsing failed. Please verify the AI service URL in backend config."
-                )
+            if (uploadRes.data.parseStatus === "completed") {
+                try {
+                    const parsedRes = await cvApi.getParsedData();
+                    const cvData = parsedRes.data.cvData;
+                    if (cvData) {
+                        if (cvData.interview_level) {
+                            setSelectedLevel(cvData.interview_level);
+                        }
+                        if (cvData.interview_type) {
+                            setSelectedType(cvData.interview_type);
+                        }
+                        setIsAutoSelected(true);
+                    }
+                } catch (err) {
+                    console.error("Failed to fetch parsed data for auto-selection", err);
+                }
             }
         } catch (err) {
             console.error("Upload failed", err)
@@ -398,19 +424,17 @@ export default function InterviewSetupPage() {
                                 </div>
                             ) : (
                                 cvs.map(cv => (
-                                    <div 
+                                    <div
                                         key={cv.id}
                                         onClick={() => handleSelectCv(cv.id)}
-                                        className={`group relative flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer ${
-                                            cv.isCurrent 
-                                            ? "border-blue-600 bg-blue-50/30" 
+                                        className={`group relative flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer ${cv.isCurrent
+                                            ? "border-blue-600 bg-blue-50/30"
                                             : "border-gray-50 hover:border-blue-200"
-                                        }`}
+                                            }`}
                                     >
                                         <div className="flex items-center gap-4">
-                                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${
-                                                cv.isCurrent ? "bg-blue-600 text-white shadow-lg shadow-blue-200" : "bg-blue-50 text-blue-600"
-                                            }`}>
+                                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${cv.isCurrent ? "bg-blue-600 text-white shadow-lg shadow-blue-200" : "bg-blue-50 text-blue-600"
+                                                }`}>
                                                 <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                                                 </svg>
@@ -431,11 +455,11 @@ export default function InterviewSetupPage() {
                                                 </p>
                                             </div>
                                         </div>
-                                        
+
                                         <div className="flex items-center gap-2">
-                                            <a 
-                                                href={cv.storagePath} 
-                                                target="_blank" 
+                                            <a
+                                                href={cv.storagePath}
+                                                target="_blank"
                                                 rel="noopener noreferrer"
                                                 onClick={(e) => e.stopPropagation()}
                                                 className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-gray-100 text-gray-400 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm"
@@ -446,7 +470,7 @@ export default function InterviewSetupPage() {
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                                 </svg>
                                             </a>
-                                            <button 
+                                            <button
                                                 onClick={(e) => handleDeleteCv(cv.id, e)}
                                                 className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-gray-100 text-gray-400 hover:text-red-500 hover:border-red-200 transition-all shadow-sm"
                                                 title="Delete CV"
@@ -465,9 +489,9 @@ export default function InterviewSetupPage() {
                     {/* Job Description Section */}
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
                         <div className="flex items-center gap-2 mb-5">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
                             <h2 className="font-bold text-gray-900 text-lg">Job Description</h2>
                         </div>
                         <div className="space-y-3">
@@ -549,10 +573,10 @@ export default function InterviewSetupPage() {
                                         ))}
                                     </div>
                                     <div className="flex gap-2">
-                                        <input 
-                                            type="text" 
-                                            value={newRequirement} 
-                                            onChange={e => setNewRequirement(e.target.value)} 
+                                        <input
+                                            type="text"
+                                            value={newRequirement}
+                                            onChange={e => setNewRequirement(e.target.value)}
                                             onKeyDown={e => {
                                                 if (e.key === 'Enter') {
                                                     e.preventDefault();
@@ -562,11 +586,11 @@ export default function InterviewSetupPage() {
                                                     }
                                                 }
                                             }}
-                                            placeholder="Add custom requirement tag & press Enter..." 
+                                            placeholder="Add custom requirement tag & press Enter..."
                                             className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-gray-200 outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
                                         />
-                                        <button 
-                                            type="button" 
+                                        <button
+                                            type="button"
                                             onClick={() => {
                                                 if (newRequirement.trim()) {
                                                     setKeyRequirements(prev => [...prev, newRequirement.trim()]);
@@ -582,117 +606,6 @@ export default function InterviewSetupPage() {
                             )}
 
                         </div>
-                    </div>
-
-                    {/* Job Selection - 3 Columns */}
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                        <div className="flex items-center gap-2 mb-5">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                            </svg>
-                            <h2 className="font-bold text-gray-900 text-lg">Job Selection</h2>
-                        </div>
-
-                        {loadingGroups ? (
-                            <div className="grid grid-cols-3 gap-4">
-                                {[0,1,2].map(i => (
-                                    <div key={i} className="h-48 bg-gray-50 rounded-xl animate-pulse" />
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                {/* Column 1: Job Groups */}
-                                <div className="flex flex-col gap-1">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 px-1">Job Groups</p>
-                                    <div className="space-y-1 max-h-56 overflow-y-auto pr-1 scrollbar-thin">
-                                        {groups.length === 0 ? (
-                                            <p className="text-xs text-gray-400 italic text-center py-4">No data available</p>
-                                        ) : groups.map(group => (
-                                            <button
-                                                key={group.id}
-                                                onClick={() => {
-                                                    setSelectedGroup(group)
-                                                    setSelectedCategory(null)
-                                                    setSelectedRole(null)
-                                                }}
-                                                className={`w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                                                    selectedGroup?.id === group.id
-                                                        ? "bg-primary text-white shadow-md shadow-primary/20"
-                                                        : "bg-gray-50 text-gray-600 hover:bg-primary/5 hover:text-primary"
-                                                }`}
-                                            >
-                                                {group.name}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Column 2: Categories */}
-                                <div className="flex flex-col gap-1">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 px-1">Categories</p>
-                                    <div className="space-y-1 max-h-56 overflow-y-auto pr-1 scrollbar-thin">
-                                        {!selectedGroup ? (
-                                            <p className="text-xs text-gray-400 italic text-center py-4">← Select a group first</p>
-                                        ) : availableCategories.length === 0 ? (
-                                            <p className="text-xs text-gray-400 italic text-center py-4">No categories available</p>
-                                        ) : availableCategories.map(cat => (
-                                            <button
-                                                key={cat.id}
-                                                onClick={() => {
-                                                    setSelectedCategory(cat)
-                                                    setSelectedRole(null)
-                                                }}
-                                                className={`w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                                                    selectedCategory?.id === cat.id
-                                                        ? "bg-indigo-600 text-white shadow-md shadow-indigo-200"
-                                                        : "bg-gray-50 text-gray-600 hover:bg-indigo-50 hover:text-indigo-600"
-                                                }`}
-                                            >
-                                                {cat.name}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Column 3: Roles */}
-                                <div className="flex flex-col gap-1">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 px-1">Job Roles</p>
-                                    <div className="space-y-1 max-h-56 overflow-y-auto pr-1 scrollbar-thin">
-                                        {!selectedCategory ? (
-                                            <p className="text-xs text-gray-400 italic text-center py-4">← Select a category first</p>
-                                        ) : availableRoles.length === 0 ? (
-                                            <p className="text-xs text-gray-400 italic text-center py-4">No roles available</p>
-                                        ) : availableRoles.map(role => (
-                                            <button
-                                                key={role.id}
-                                                onClick={() => setSelectedRole(role)}
-                                                className={`w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                                                    selectedRole?.id === role.id
-                                                        ? "bg-emerald-600 text-white shadow-md shadow-emerald-200"
-                                                        : "bg-gray-50 text-gray-600 hover:bg-emerald-50 hover:text-emerald-600"
-                                                }`}
-                                            >
-                                                {role.name}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Selection Summary */}
-                        {(selectedGroup || selectedCategory || selectedRole) && (
-                            <motion.div
-                                initial={{ opacity: 0, y: 6 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="mt-4 pt-4 border-t border-gray-100 flex flex-wrap items-center gap-2"
-                            >
-                                <span className="text-xs text-gray-400 font-semibold">Selected:</span>
-                                {selectedGroup && <span className="px-2.5 py-1 bg-primary/10 text-primary text-xs font-bold rounded-lg">{selectedGroup.name}</span>}
-                                {selectedCategory && <><span className="text-gray-300">›</span><span className="px-2.5 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-lg">{selectedCategory.name}</span></>}
-                                {selectedRole && <><span className="text-gray-300">›</span><span className="px-2.5 py-1 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-lg">{selectedRole.name}</span></>}
-                            </motion.div>
-                        )}
                     </div>
 
                     {/* Experience Level */}

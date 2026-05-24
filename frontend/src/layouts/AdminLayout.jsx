@@ -51,10 +51,6 @@ export default function AdminLayout() {
                             <FiUser className="text-lg" />
                             Users
                         </Link>
-                        <Link to="/admin/jobs" className={`flex items-center gap-4 px-4 py-3 rounded-2xl font-medium transition-transform ${location.pathname.includes('/admin/jobs') ? 'bg-primary text-white shadow-md shadow-primary/30 hover:scale-105' : 'text-gray-500 hover:bg-slate-100 hover:text-gray-900'}`}>
-                            <FiBriefcase className="text-lg" />
-                            Jobs
-                        </Link>
                         <Link to="/admin/experience-levels" className={`flex items-center gap-4 px-4 py-3 rounded-2xl font-medium transition-transform ${location.pathname.includes('/admin/experience-levels') ? 'bg-primary text-white shadow-md shadow-primary/30 hover:scale-105' : 'text-gray-500 hover:bg-slate-100 hover:text-gray-900'}`}>
                             <FiBriefcase className="text-lg" />
                             Exp Levels

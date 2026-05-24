@@ -67,13 +67,7 @@ export const experienceLevelsApi = {
     getActive: () => api.get('/experience-levels'),
 };
 
-export const jobCategoryApi = {
-    list: () => api.get('/jobs/categories'),
-};
 
-export const jobGroupApi = {
-    list: () => api.get('/jobs/groups'),
-};
 
 export const adminPricingPlansApi = {
     getAll: () => api.get('/admin/pricing-plans'),
