@@ -32,6 +32,8 @@ export default function LiveInterviewPage() {
     const [seconds, setSeconds] = useState(0)
     const [isPaused, setIsPaused] = useState(false)
     const [sessionSecondsLeft, setSessionSecondsLeft] = useState(14 * 60 + 22)
+    const [isAiMuted, setIsAiMuted] = useState(false)
+    const [isAiSpeaking, setIsAiSpeaking] = useState(false)
 
     const mediaRecorderRef = useRef(null)
     const audioChunksRef = useRef([])
@@ -135,7 +137,16 @@ export default function LiveInterviewPage() {
     }, [sessionStarted, mediaStream])
 
     useEffect(() => {
-        if (!sessionStarted) return
+        if (!sessionStarted || isSubmittingAnswer || isPaused || isAiSpeaking) {
+            if (recognitionRef.current) {
+                try {
+                    recognitionRef.current.stop()
+                } catch (e) {
+                    // Ignore already stopped
+                }
+            }
+            return
+        }
 
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
         if (!SpeechRecognition) {
@@ -170,20 +181,31 @@ export default function LiveInterviewPage() {
         }
 
         recognition.onend = () => {
-            if (sessionStarted) {
-                recognition.start()
+            // Only restart if none of the stopping conditions are met
+            if (sessionStarted && !isSubmittingAnswer && !isPaused && !isAiSpeaking) {
+                try {
+                    recognition.start()
+                } catch (err) {
+                    console.error("Failed to restart speech recognition", err)
+                }
             }
         }
 
-        recognition.start()
+        try {
+            recognition.start()
+        } catch (err) {
+            console.error("Failed to start speech recognition", err)
+        }
         recognitionRef.current = recognition
 
         return () => {
             recognition.onend = null
-            recognition.stop()
+            try {
+                recognition.stop()
+            } catch (e) { }
             recognitionRef.current = null
         }
-    }, [sessionStarted])
+    }, [sessionStarted, isSubmittingAnswer, isPaused, isAiSpeaking])
 
     useEffect(() => {
         return () => {
@@ -192,6 +214,45 @@ export default function LiveInterviewPage() {
             }
         }
     }, [mediaStream])
+
+
+
+    useEffect(() => {
+        if (!sessionStarted || !currentQuestionText || isAiMuted || isPaused) {
+            window.speechSynthesis.cancel()
+            return
+        }
+
+        const speak = () => {
+            window.speechSynthesis.cancel()
+            const utterance = new SpeechSynthesisUtterance(currentQuestionText)
+            utterance.lang = "en-US"
+            utterance.rate = 0.95
+            utterance.pitch = 1.0
+
+            utterance.onstart = () => setIsAiSpeaking(true)
+            utterance.onend = () => setIsAiSpeaking(false)
+            utterance.onerror = () => setIsAiSpeaking(false)
+
+            const voices = window.speechSynthesis.getVoices()
+            // Prefer a natural sounding google voice if available
+            const voice = voices.find(v => v.lang.startsWith("en") && (v.name.includes("Google") || v.name.includes("Natural"))) || voices[0]
+            if (voice) utterance.voice = voice
+
+            window.speechSynthesis.speak(utterance)
+        }
+
+        if (window.speechSynthesis.getVoices().length === 0) {
+            window.speechSynthesis.onvoiceschanged = speak
+        } else {
+            speak()
+        }
+
+        return () => {
+            window.speechSynthesis.cancel()
+            setIsAiSpeaking(false)
+        }
+    }, [questionNum, sessionStarted, isAiMuted, isPaused])
 
     const fmt = (secs) => {
         const m = String(Math.floor(secs / 60)).padStart(2, "0")
@@ -263,6 +324,15 @@ export default function LiveInterviewPage() {
 
         setIsSubmittingAnswer(true)
         setRecordingError("")
+
+        // Explicitly stop recognition to prevent voice leakage during transition
+        if (recognitionRef.current) {
+            try {
+                recognitionRef.current.stop()
+            } catch (e) {
+                console.warn("Speech recognition already stopped", e)
+            }
+        }
 
         const audioBlob = await stopQuestionCapture()
         const audioStoragePath = await uploadAudioBlob(audioBlob, currentQuestion.id)
@@ -425,6 +495,23 @@ export default function LiveInterviewPage() {
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => setIsAiMuted(prev => !prev)}
+                            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors border ${isAiMuted ? "bg-red-50 border-red-100 text-red-500" : "bg-gray-50 border-gray-100 text-gray-600 hover:bg-gray-100"
+                                }`}
+                            title={isAiMuted ? "Unmute AI Voice" : "Mute AI Voice"}
+                        >
+                            {isAiMuted ? (
+                                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                                </svg>
+                            ) : (
+                                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                                </svg>
+                            )}
+                        </button>
                         <div className="flex items-center gap-2 text-sm text-gray-600 font-medium bg-gray-50 px-3 py-1.5 rounded-lg">
                             <span>Session Ends:</span>
                             <span className="font-bold text-gray-900">{fmt(sessionSecondsLeft)}</span>
@@ -510,10 +597,10 @@ export default function LiveInterviewPage() {
                             <div className="mt-5 rounded-2xl border border-gray-100 bg-slate-50 p-4">
                                 <div className="flex items-center justify-between mb-3 text-xs text-gray-500">
                                     <span>Your live answer transcript</span>
-                                    <span>{isRecording ? "Recording audio..." : "Listening..."}</span>
+                                    <span>{isSubmittingAnswer ? "Submitting..." : isAiSpeaking ? "AI is speaking..." : isRecording ? "Recording audio..." : "Listening..."}</span>
                                 </div>
                                 <p className="min-h-[5rem] text-gray-700 text-sm leading-relaxed">
-                                    {currentTranscript || "Speak clearly into your microphone. Your answer will appear here as you speak."}
+                                    {currentTranscript || (isAiSpeaking ? "Waiting for AI to finish reading the question..." : "Speak clearly into your microphone. Your answer will appear here as you speak.")}
                                 </p>
                                 {recordingError && (
                                     <p className="mt-3 text-xs text-red-600">{recordingError}</p>
