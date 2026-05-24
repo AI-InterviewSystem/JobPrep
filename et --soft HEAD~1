@@ -1,0 +1,57 @@
+[33m6123a32[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mfeat/Api[m[33m)[m Remove secrets
+[33ma4b6292[m[33m ([m[1;32mfeat/AI[m[33m)[m feat: implement AI API client and interview session management service to support automated interview flows
+[33mbbc68a6[m[33m ([m[1;31morigin/feat/Api[m[33m)[m feat: implement AI-powered interview flow with backend integration and frontend UI components
+[33m37977f1[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m)[m Merge pull request #26 from AI-InterviewSystem/feat/audio
+[33m78f03d5[m complete mic, audio in live interview
+[33m84e7848[m Merge pull request #25 from AI-InterviewSystem/feat/experienceLevel
+[33m85bd747[m complet feature experience level in role admin, user
+[33m67fb1b0[m Merge pull request #24 from AI-InterviewSystem/UI/update
+[33m582b835[m update UX/UI admin dashboard
+[33m2aae93f[m Merge pull request #23 from AI-InterviewSystem/update/jobs
+[33m264eab8[m update feature select jobs
+[33md521e07[m Merge pull request #22 from AI-InterviewSystem/feat/JD
+[33m5dab139[m complet feature job descriptions and update UI admin
+[33m0ad1cfb[m[33m ([m[1;32mfeat/ManageFeedback[m[33m)[m Merge pull request #21 from AI-InterviewSystem/feat/ManageFeedback
+[33m4bef4a4[m[33m ([m[1;31morigin/feat/ManageFeedback[m[33m)[m feat: implement user and admin feedback management system with status tracking and history logs
+[33m2e80f72[m[33m ([m[1;32mfeat/ManagePromo[m[33m)[m Merge pull request #20 from AI-InterviewSystem/feat/ManagePromo
+[33mad92f75[m[33m ([m[1;31morigin/feat/ManagePromo[m[33m)[m fix: customer cannot apply promotion
+[33m79e8541[m Merge pull request #19 from AI-InterviewSystem/feat/ManagePromo
+[33m4cf11aa[m feat: implement promo code management module with admin CRUD interface and data seeding
+[33m106e0ca[m Merge pull request #18 from AI-InterviewSystem/feat/ManageData
+[33mf1310de[m[33m ([m[1;31morigin/feat/ManageData[m[33m, [m[1;32mfeat/ManageData[m[33m)[m feat: implement admin job category and role management system with CRUD functionality
+[33mc3fb16d[m[33m ([m[1;32mfeat/ManageUsers[m[33m)[m Merge pull request #17 from AI-InterviewSystem/feat/ManageUsers
+[33m6261839[m[33m ([m[1;31morigin/feat/ManageUsers[m[33m)[m feat: implement admin dashboard for user management, including filtering, search, and account banning functionality
+[33mb01551a[m[33m ([m[1;32mfeat/setUpInterview[m[33m)[m Merge pull request #16 from AI-InterviewSystem/UX/update-v2
+[33m0d75ce0[m[33m ([m[1;31morigin/UX/update-v2[m[33m)[m delete files html in frontend
+[33m4425f2f[m Merge pull request #15 from AI-InterviewSystem/feat/ApplyCode
+[33m97b5018[m[33m ([m[1;31morigin/feat/ApplyCode[m[33m)[m done feature apply promo code
+[33m456b1a3[m Merge pull request #14 from AI-InterviewSystem/update/Login
+[33m6d6c7cd[m[33m ([m[1;31morigin/update/Login[m[33m)[m add remember me at login page
+[33ma9e12b4[m Merge pull request #13 from AI-InterviewSystem/UI/fix
+[33m1f04854[m[33m ([m[1;31morigin/UI/fix[m[33m)[m fix UI navbar and footer
+[33m9f2b69b[m Merge pull request #12 from AI-InterviewSystem/feat/ViewAdminDashboard
+[33m13caaee[m[33m ([m[1;31morigin/feat/ViewAdminDashboard[m[33m)[m done view revenue and user in admin dashboard
+[33m466e1f3[m Merge pull request #11 from AI-InterviewSystem/feat/subscription
+[33m772596b[m[33m ([m[1;31morigin/feat/subscription[m[33m)[m fix payment monthly and yearly, done subscription
+[33m7c8f24c[m Merge pull request #10 from AI-InterviewSystem/feat/payment
+[33m1b91452[m[33m ([m[1;31morigin/feat/payment[m[33m)[m complete payment plan
+[33m8d83f2a[m Merge pull request #9 from AI-InterviewSystem/feat/PricingPlan
+[33m0656f8d[m[33m ([m[1;31morigin/feat/PricingPlan[m[33m)[m complete BE, FE View pricing plan
+[33m3fc185e[m Merge pull request #8 from AI-InterviewSystem/feat/PricingPlan
+[33m8c7bf48[m complet BE, FE add, update, delete pricing plan
+[33m6d10747[m Merge pull request #7 from AI-InterviewSystem/UI/Admin
+[33m70476f3[m[33m ([m[1;31morigin/UI/Admin[m[33m)[m Change UI admin dashboard
+[33me8123ee[m Merge pull request #6 from AI-InterviewSystem/feat/uploadCV
+[33m44aa88c[m[33m ([m[1;31morigin/feat/uploadCV[m[33m)[m complet BE, FE upload cv, view cv, delete cv
+[33m149280a[m Merge pull request #5 from AI-InterviewSystem/update/profile
+[33md97e55f[m[33m ([m[1;31morigin/update/profile[m[33m)[m fix avatar, add dob, bio
+[33m10e2978[m Merge pull request #4 from AI-InterviewSystem/feat/profile
+[33m73119f7[m[33m ([m[1;31morigin/feat/profile[m[33m)[m remove uploads
+[33m2643c56[m Merge pull request #3 from AI-InterviewSystem/feat/profile
+[33m50e3f5e[m complete BE, FE view profile, update profile, change password
+[33mbd04a4d[m Merge pull request #2 from AI-InterviewSystem/feat/ForgotPassword
+[33md0673f6[m[33m ([m[1;31morigin/feat/ForgotPassword[m[33m)[m complete feature forgot password
+[33md320cdf[m Merge pull request #1 from AI-InterviewSystem/feat/register
+[33m67e1a8b[m[33m ([m[1;31morigin/feat/register[m[33m)[m complete feature register, login, login via google
+[33m477ec75[m add backend and frontend
+[33m1791587[m Initial commit

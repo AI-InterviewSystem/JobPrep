@@ -157,5 +157,12 @@ export const interviewSessionApi = {
     delete: (id) => api.delete(`/interview-sessions/${id}`),
 };
 
+export const aiHelpersApi = {
+    checkCvJd: (data) => api.post('/ai-helpers/check-cv-jd', data),
+    checkCvJdFile: (data) => api.post('/ai-helpers/check-cv-jd-file', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+    extractAndCheck: (data) => api.post('/ai-helpers/extract-and-check', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+    generateQuestions: (data) => api.post('/ai-helpers/generate-questions', data),
+};
+
 export default api;
 

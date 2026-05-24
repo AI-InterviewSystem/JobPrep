@@ -30,6 +30,9 @@ public class InterviewSession {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    @Column(name = "ai_session_id")
+    private String aiSessionId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private User user;
