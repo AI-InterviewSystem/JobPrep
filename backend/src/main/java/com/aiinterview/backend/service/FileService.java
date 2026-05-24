@@ -30,12 +30,27 @@ public class FileService {
     }
 
     public String saveCv(MultipartFile file) {
-        return saveToBucket(file, cvBucket);
+        try {
+            return saveCv(file.getBytes(), file.getOriginalFilename(), file.getContentType());
+        } catch (Exception e) {
+            throw new RuntimeException("Could not store the file. Error: " + e.getMessage(), e);
+        }
+    }
+
+    public String saveCv(byte[] fileBytes, String originalFilename, String contentType) {
+        return saveToBucket(fileBytes, originalFilename, contentType, cvBucket);
     }
 
     private String saveToBucket(MultipartFile file, String targetBucket) {
         try {
-            String originalFilename = file.getOriginalFilename();
+            return saveToBucket(file.getBytes(), file.getOriginalFilename(), file.getContentType(), targetBucket);
+        } catch (Exception e) {
+            throw new RuntimeException("Could not store the file. Error: " + e.getMessage(), e);
+        }
+    }
+
+    private String saveToBucket(byte[] fileBytes, String originalFilename, String contentType, String targetBucket) {
+        try {
             String extension = "";
             if (originalFilename != null && originalFilename.contains(".")) {
                 extension = originalFilename.substring(originalFilename.lastIndexOf("."));
@@ -46,9 +61,9 @@ public class FileService {
             HttpHeaders headers = new HttpHeaders();
             headers.set("Authorization", "Bearer " + supabaseKey);
             headers.set("apikey", supabaseKey);
-            headers.setContentType(MediaType.parseMediaType(file.getContentType() != null ? file.getContentType() : "application/octet-stream"));
+            headers.setContentType(MediaType.parseMediaType(contentType != null ? contentType : "application/octet-stream"));
 
-            HttpEntity<byte[]> entity = new HttpEntity<>(file.getBytes(), headers);
+            HttpEntity<byte[]> entity = new HttpEntity<>(fileBytes, headers);
 
             ResponseEntity<String> response = restTemplate.exchange(uploadUrl, HttpMethod.POST, entity, String.class);
 

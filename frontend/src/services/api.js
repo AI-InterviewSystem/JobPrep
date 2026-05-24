@@ -51,6 +51,7 @@ export const cvApi = {
         });
     },
     list: () => api.get('/cvs'),
+    getParsedData: () => api.get('/cvs/current/parsed-data'),
     delete: (id) => api.delete(`/cvs/${id}`),
     setCurrent: (id) => api.put(`/cvs/${id}/set-current`),
 };
@@ -151,7 +152,7 @@ export const interviewSessionApi = {
     create: (data) => api.post('/interview-sessions', data),
     get: (id) => api.get(`/interview-sessions/${id}`),
     list: () => api.get('/interview-sessions'),
-    start: (id) => api.post(`/interview-sessions/${id}/start`),
+    start: (id, data) => api.post(`/interview-sessions/${id}/start`, data || {}),
     submitAnswer: (id, data) => api.post(`/interview-sessions/${id}/answers`, data),
     complete: (id) => api.post(`/interview-sessions/${id}/complete`),
     delete: (id) => api.delete(`/interview-sessions/${id}`),
@@ -159,8 +160,23 @@ export const interviewSessionApi = {
 
 export const aiHelpersApi = {
     checkCvJd: (data) => api.post('/ai-helpers/check-cv-jd', data),
-    checkCvJdFile: (data) => api.post('/ai-helpers/check-cv-jd-file', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
-    extractAndCheck: (data) => api.post('/ai-helpers/extract-and-check', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+    checkCurrentCvJd: (data) => api.post('/ai-helpers/check-current-cv-jd', data),
+    checkCvJdFile: (file, jobDescription) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('job_description', jobDescription);
+        return api.post('/ai-helpers/check-cv-jd-file', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+    },
+    extractAndCheck: (file, jobDescription) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('job_description', jobDescription);
+        return api.post('/ai-helpers/extract-and-check', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+    },
     generateQuestions: (data) => api.post('/ai-helpers/generate-questions', data),
 };
 

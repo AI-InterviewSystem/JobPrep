@@ -28,8 +28,8 @@ public class InterviewSessionService {
     private final InterviewAnswerRepository answerRepository;
     private final UserRepository userRepository;
     private final JobDescriptionRepository jobDescriptionRepository;
-    private final CvUploadRepository cvUploadRepository;
     private final AiApiClient aiApiClient;
+    private final CvUploadService cvUploadService;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -58,26 +58,24 @@ public class InterviewSessionService {
     }
 
     @Transactional
-    public InterviewSessionResponse startSession(UUID sessionId, String userEmail) {
+    public InterviewSessionResponse startSession(UUID sessionId, String userEmail, StartInterviewSessionRequest startRequest) {
         InterviewSession session = findSession(sessionId, userEmail);
         User user = session.getUser();
-
-        List<CvUpload> cvs = cvUploadRepository.findByUserAndDeletedAtIsNullOrderByCreatedAtDesc(user);
-        Object cvDataObj = new HashMap<>();
-        if (!cvs.isEmpty() && cvs.get(0).getParsedData() != null) {
-            try {
-                JsonNode cvDataNode = objectMapper.readTree(cvs.get(0).getParsedData());
-                if (cvDataNode.has("data")) {
-                    cvDataObj = cvDataNode.get("data");
-                } else {
-                    cvDataObj = cvDataNode;
-                }
-            } catch (Exception e) {
-                log.warn("Could not parse CV data, using empty object");
-            }
-        } else {
-            log.info("No CV data available, starting interview with empty cv_data");
+        List<InterviewQuestion> existingQuestions = questionRepository.findBySessionIdOrderByOrderIndexAsc(sessionId);
+        if (session.getStatus() == InterviewStatus.IN_PROGRESS && session.getAiSessionId() != null && !existingQuestions.isEmpty()) {
+            return buildResponse(session, existingQuestions);
         }
+
+        Map<String, Object> cvDataObj = cvUploadService.getCvDataForAi(user);
+        if (cvDataObj == null || cvDataObj.isEmpty()) {
+            throw new AppException("No parsed CV data found. Upload a CV and wait for AI parsing before starting the interview.");
+        }
+
+        String interviewType = mapInterviewType(startRequest != null ? startRequest.getInterviewType() : null);
+        String interviewLevel = mapInterviewLevel(startRequest != null ? startRequest.getInterviewLevel() : null);
+        int numQuestions = startRequest != null && startRequest.getNumQuestions() != null
+                ? startRequest.getNumQuestions()
+                : 5;
 
         try {
             Map<String, Object> req = new HashMap<>();
@@ -87,22 +85,14 @@ public class InterviewSessionService {
             } else {
                 req.put("job_description", "General technical interview.");
             }
-            req.put("interview_type", "Technical");
-            req.put("interview_level", "Mid");
-            req.put("num_questions", 5);
+            req.put("interview_type", interviewType);
+            req.put("interview_level", interviewLevel);
+            req.put("num_questions", numQuestions);
             req.put("passing_score", 0);
 
-            String aiResponse;
-            try {
-                aiResponse = aiApiClient.startInterview(req);
-            } catch (Exception aiEx) {
-                log.warn("AI server unreachable, starting session with fallback questions: {}", aiEx.getMessage());
-                session.setStatus(InterviewStatus.IN_PROGRESS);
-                session.setStartTime(LocalDateTime.now());
-                InterviewSession saved = sessionRepository.save(session);
-                List<InterviewQuestion> fallbackQuestions = createFallbackQuestions(saved);
-                return buildResponse(saved, fallbackQuestions);
-            }
+            log.info("Starting AI interview session. sessionId={}, interviewType={}, interviewLevel={}, hasJobDescription={}",
+                    sessionId, interviewType, interviewLevel, session.getJobDescription() != null);
+            String aiResponse = aiApiClient.startInterview(req);
 
             JsonNode resNode = objectMapper.readTree(aiResponse);
 
@@ -119,9 +109,13 @@ public class InterviewSessionService {
             JsonNode nextQ = resNode.get("next_question");
             List<InterviewQuestion> questions = new ArrayList<>();
             if (nextQ != null && !nextQ.isNull()) {
+                String questionText = nextQ.has("question_text") ? nextQ.get("question_text").asText() : "";
+                if (questionText.isBlank()) {
+                    throw new AppException("AI did not return a valid next_question.question_text.");
+                }
                 InterviewQuestion q = InterviewQuestion.builder()
                         .session(saved)
-                        .questionText(nextQ.has("question_text") ? nextQ.get("question_text").asText() : "")
+                        .questionText(questionText)
                         .aiQuestionId(nextQ.has("id") ? nextQ.get("id").asText() : "")
                         .questionSource(QuestionSource.AI_GENERATED)
                         .jobRequirementTag(nextQ.has("topic") ? nextQ.get("topic").asText() : "")
@@ -129,6 +123,9 @@ public class InterviewSessionService {
                         .build();
                 questionRepository.save(q);
                 questions.add(q);
+            }
+            if (questions.isEmpty()) {
+                throw new AppException("AI did not return the first interview question.");
             }
             return buildResponse(saved, questions);
         } catch (AppException e) {
@@ -139,25 +136,27 @@ public class InterviewSessionService {
         }
     }
 
-    private List<InterviewQuestion> createFallbackQuestions(InterviewSession session) {
-        List<String> defaults = List.of(
-                "Tell me about yourself and your background.",
-                "What is your greatest professional achievement?",
-                "Describe a challenging problem you solved and how you approached it.",
-                "Where do you see yourself in the next 3-5 years?",
-                "Do you have any questions for us?");
-        List<InterviewQuestion> saved = new ArrayList<>();
-        for (int i = 0; i < defaults.size(); i++) {
-            InterviewQuestion q = InterviewQuestion.builder()
-                    .session(session)
-                    .questionText(defaults.get(i))
-                    .aiQuestionId("fallback-q" + (i + 1))
-                    .questionSource(QuestionSource.AI_GENERATED)
-                    .orderIndex(i + 1)
-                    .build();
-            saved.add(questionRepository.save(q));
+    private String mapInterviewType(String type) {
+        if (type == null || type.isBlank()) {
+            return "Technical";
         }
-        return saved;
+        return switch (type.trim()) {
+            case "HR Interview" -> "HR";
+            case "Behavioral" -> "Behavioral";
+            default -> type.trim();
+        };
+    }
+
+    private String mapInterviewLevel(String level) {
+        if (level == null || level.isBlank()) {
+            return "Mid";
+        }
+        return switch (level.trim()) {
+            case "Intern" -> "Intern";
+            case "Fresher" -> "Junior";
+            case "Junior" -> "Mid";
+            default -> level.trim();
+        };
     }
 
     @Transactional
@@ -212,16 +211,20 @@ public class InterviewSessionService {
 
             JsonNode nextQ = resNode.get("next_question");
             if (nextQ != null && !nextQ.isNull()) {
-                InterviewQuestion q = InterviewQuestion.builder()
-                        .session(session)
-                        .questionText(nextQ.has("question_text") ? nextQ.get("question_text").asText() : "")
-                        .aiQuestionId(nextQ.has("id") ? nextQ.get("id").asText() : "")
-                        .questionSource(QuestionSource.AI_GENERATED)
-                        .jobRequirementTag(nextQ.has("topic") ? nextQ.get("topic").asText() : "")
-                        .orderIndex((question.getOrderIndex() != null ? question.getOrderIndex() : 0) + 1)
-                        .build();
-                questionRepository.save(q);
+                saveAiQuestion(session, nextQ, (question.getOrderIndex() != null ? question.getOrderIndex() : 0) + 1);
             }
+        } catch (AiApiClient.AiProviderRateLimitException e) {
+            log.warn("AI provider rate-limited while submitting answer for session {}. Saving answer and continuing with a predefined question.",
+                    sessionId);
+            answer.setFeedback("AI evaluation is temporarily unavailable because the AI provider is rate-limited. This answer was saved and can be reviewed later.");
+            answerRepository.save(answer);
+            createFallbackQuestionIfNeeded(session, question, "AI provider rate-limited");
+        } catch (AiApiClient.AiProviderInvalidResponseException e) {
+            log.warn("AI provider returned invalid answer response for session {}. Saving answer and continuing with a predefined question.",
+                    sessionId);
+            answer.setFeedback("AI evaluation is temporarily unavailable because the AI service returned an invalid response. This answer was saved and can be reviewed later.");
+            answerRepository.save(answer);
+            createFallbackQuestionIfNeeded(session, question, "AI response invalid");
         } catch (Exception e) {
             log.error("AI API Error", e);
             throw new AppException("Failed to communicate with AI API: " + e.getMessage());
@@ -270,9 +273,24 @@ public class InterviewSessionService {
 
             List<InterviewQuestion> questions = questionRepository.findBySessionIdOrderByOrderIndexAsc(sessionId);
             return buildResponse(saved, questions);
+        } catch (AiApiClient.AiProviderRateLimitException e) {
+            log.warn("AI provider rate-limited while generating summary for session {}. Completing with partial summary.",
+                    sessionId);
+            return completeWithPartialSummary(session, sessionId,
+                    "AI summary is temporarily unavailable because the AI provider is rate-limited. Your interview answers were saved.",
+                    "AI_RATE_LIMITED");
+        } catch (AiApiClient.AiProviderInvalidResponseException e) {
+            log.warn("AI provider returned invalid summary response for session {}. Completing with partial summary.",
+                    sessionId);
+            return completeWithPartialSummary(session, sessionId,
+                    "AI summary is temporarily unavailable because the AI service returned an invalid or incomplete response. Your interview answers were saved.",
+                    "AI_INVALID_RESPONSE");
         } catch (Exception e) {
-            log.error("AI API Error", e);
-            throw new AppException("Failed to communicate with AI API for summary: " + e.getMessage());
+            log.warn("AI summary failed for session {}. Completing with partial summary: {}",
+                    sessionId, e.getMessage());
+            return completeWithPartialSummary(session, sessionId,
+                    "AI summary is temporarily unavailable because the AI service returned an invalid or incomplete response. Your interview answers were saved.",
+                    "AI_UNAVAILABLE");
         }
     }
 
@@ -303,6 +321,81 @@ public class InterviewSessionService {
         return session;
     }
 
+    private void saveAiQuestion(InterviewSession session, JsonNode nextQ, int orderIndex) {
+        String questionText = nextQ.has("question_text") ? nextQ.get("question_text").asText() : "";
+        if (questionText.isBlank()) {
+            return;
+        }
+        InterviewQuestion q = InterviewQuestion.builder()
+                .session(session)
+                .questionText(questionText)
+                .aiQuestionId(nextQ.has("id") ? nextQ.get("id").asText() : "")
+                .questionSource(QuestionSource.AI_GENERATED)
+                .jobRequirementTag(nextQ.has("topic") ? nextQ.get("topic").asText() : "")
+                .orderIndex(orderIndex)
+                .build();
+        questionRepository.save(q);
+    }
+
+    private void createFallbackQuestionIfNeeded(InterviewSession session, InterviewQuestion answeredQuestion, String reason) {
+        int currentIndex = answeredQuestion.getOrderIndex() != null ? answeredQuestion.getOrderIndex() : 1;
+        if (currentIndex >= 5) {
+            return;
+        }
+
+        int nextIndex = currentIndex + 1;
+        String questionText = fallbackQuestionText(nextIndex);
+        InterviewQuestion q = InterviewQuestion.builder()
+                .session(session)
+                .questionText(questionText)
+                .aiQuestionId("degraded-fallback-q" + nextIndex)
+                .questionSource(QuestionSource.PRE_DEFINED)
+                .jobRequirementTag(reason)
+                .orderIndex(nextIndex)
+                .build();
+        questionRepository.save(q);
+    }
+
+    private String fallbackQuestionText(int orderIndex) {
+        return switch (orderIndex) {
+            case 2 -> "Describe a project or responsibility from your CV that best matches this role. What was your specific contribution?";
+            case 3 -> "Tell me about a difficult technical or workplace problem you handled. How did you approach it and what was the result?";
+            case 4 -> "Which skill from your CV would you most want to demonstrate in this position, and how have you applied it in practice?";
+            case 5 -> "What would you improve in your previous work if you had more time or resources, and why?";
+            default -> "Tell me about your background and how it relates to this role.";
+        };
+    }
+
+    private InterviewSessionResponse completeWithPartialSummary(InterviewSession session, UUID sessionId, String message, String aiStatus) {
+        List<InterviewQuestion> questions = questionRepository.findBySessionIdOrderByOrderIndexAsc(sessionId);
+        List<InterviewAnswer> answers = answerRepository.findAll().stream()
+                .filter(answer -> answer.getQuestion() != null
+                        && answer.getQuestion().getSession() != null
+                        && sessionId.equals(answer.getQuestion().getSession().getId()))
+                .toList();
+
+        answers.stream()
+                .map(InterviewAnswer::getScore)
+                .filter(Objects::nonNull)
+                .mapToInt(Integer::intValue)
+                .average()
+                .ifPresent(avg -> session.setOverallScore(BigDecimal.valueOf(Math.round(avg * 100.0) / 100.0)));
+
+        session.setSummaryText(message);
+        if (session.getStrengths() == null || session.getStrengths().isEmpty()) {
+            session.setStrengths(List.of("Interview answers were recorded successfully."));
+        }
+        if (session.getWeaknesses() == null || session.getWeaknesses().isEmpty()) {
+            session.setWeaknesses(List.of("AI-generated detailed feedback is unavailable for this attempt."));
+        }
+        session.setNextSteps(aiStatus + ": Retry the interview summary later after the AI provider is available, or review the saved answers manually.");
+        session.setStatus(InterviewStatus.COMPLETED);
+        session.setEndTime(LocalDateTime.now());
+
+        InterviewSession saved = sessionRepository.save(session);
+        return buildResponse(saved, questions);
+    }
+
     private InterviewSessionResponse buildResponse(InterviewSession session, List<InterviewQuestion> questions) {
         List<InterviewQuestionResponse> qDtos = questions.stream()
                 .map(q -> InterviewQuestionResponse.builder()
@@ -325,8 +418,31 @@ public class InterviewSessionService {
                 .weaknesses(session.getWeaknesses())
                 .summaryText(session.getSummaryText())
                 .nextSteps(session.getNextSteps())
+                .aiStatus(resolveAiStatus(session, questions))
+                .aiMessage(resolveAiMessage(session, questions))
                 .createdAt(session.getCreatedAt())
                 .questions(qDtos)
                 .build();
+    }
+
+    private String resolveAiStatus(InterviewSession session, List<InterviewQuestion> questions) {
+        if (questions.stream().anyMatch(q -> q.getQuestionSource() == QuestionSource.PRE_DEFINED)) {
+            return "DEGRADED";
+        }
+        if (session.getNextSteps() != null && session.getNextSteps().startsWith("AI_")) {
+            return "DEGRADED";
+        }
+        return "OK";
+    }
+
+    private String resolveAiMessage(InterviewSession session, List<InterviewQuestion> questions) {
+        if (session.getNextSteps() != null && session.getNextSteps().startsWith("AI_")) {
+            return session.getSummaryText();
+        }
+        boolean hasFallbackQuestion = questions.stream().anyMatch(q -> q.getQuestionSource() == QuestionSource.PRE_DEFINED);
+        if (hasFallbackQuestion) {
+            return "AI provider was temporarily unavailable for one or more turns, so predefined backup questions were used.";
+        }
+        return null;
     }
 }

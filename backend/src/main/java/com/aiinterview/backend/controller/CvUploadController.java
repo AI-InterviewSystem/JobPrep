@@ -1,5 +1,6 @@
 package com.aiinterview.backend.controller;
 
+import com.aiinterview.backend.dto.CvParsedDataResponse;
 import com.aiinterview.backend.dto.CvUploadDto;
 import com.aiinterview.backend.entity.CvUpload;
 import com.aiinterview.backend.entity.User;
@@ -8,6 +9,7 @@ import com.aiinterview.backend.repository.UserRepository;
 import com.aiinterview.backend.service.FileService;
 import com.aiinterview.backend.service.UserPrincipal;
 import com.aiinterview.backend.service.AiApiClient;
+import com.aiinterview.backend.service.CvUploadService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -28,6 +30,7 @@ public class CvUploadController {
     private final UserRepository userRepository;
     private final FileService fileService;
     private final AiApiClient aiApiClient;
+    private final CvUploadService cvUploadService;
 
     @PostMapping("/upload")
     public ResponseEntity<CvUploadDto> uploadCv(
@@ -37,28 +40,37 @@ public class CvUploadController {
         User user = userRepository.findById(principal.getId())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // Single CV logic: Delete all existing CVs for this user before uploading new
-        // one
+        if (file.isEmpty()) {
+            throw new RuntimeException("Uploaded file is empty");
+        }
+
+        byte[] fileBytes;
+        try {
+            fileBytes = file.getBytes();
+        } catch (Exception e) {
+            throw new RuntimeException("Could not read uploaded file", e);
+        }
+
+        String originalFilename = file.getOriginalFilename();
+        String contentType = file.getContentType() != null ? file.getContentType() : "application/pdf";
+
+        // Single CV logic: Delete all existing CVs for this user before uploading new one
         List<CvUpload> existingCvs = cvUploadRepository.findByUserAndDeletedAtIsNullOrderByCreatedAtDesc(user);
         for (CvUpload oldCv : existingCvs) {
-            // Delete from Supabase storage
             fileService.delete(oldCv.getStoragePath());
-
-            // Soft delete in database
             oldCv.setDeletedAt(LocalDateTime.now());
             oldCv.setIsCurrent(false);
             cvUploadRepository.save(oldCv);
         }
 
-        // Upload to Supabase
-        String storageUrl = fileService.saveCv(file);
+        String storageUrl = fileService.saveCv(fileBytes, originalFilename, contentType);
 
         CvUpload cvUpload = CvUpload.builder()
                 .user(user)
-                .fileName(file.getOriginalFilename())
+                .fileName(originalFilename)
                 .storagePath(storageUrl)
-                .fileSize((int) file.getSize())
-                .mimeType(file.getContentType())
+                .fileSize(fileBytes.length)
+                .mimeType(contentType)
                 .isCurrent(true)
                 .parseStatus("pending")
                 .build();
@@ -66,18 +78,26 @@ public class CvUploadController {
         CvUpload saved = cvUploadRepository.save(cvUpload);
 
         try {
-            String aiResult = aiApiClient.extractCv(file);
+            String aiResult = aiApiClient.extractCv(fileBytes, originalFilename, contentType);
             saved.setParsedData(aiResult);
             saved.setParseStatus("completed");
         } catch (Exception e) {
             String errorMsg = e.getMessage();
-            saved.setRawText(errorMsg != null && errorMsg.length() > 255 ? errorMsg.substring(0, 255) : errorMsg);
+            saved.setRawText(truncateError(errorMsg));
             saved.setParseStatus("failed");
         }
 
         saved = cvUploadRepository.save(saved);
 
         return ResponseEntity.ok(mapToDto(saved));
+    }
+
+    @GetMapping("/current/parsed-data")
+    public ResponseEntity<CvParsedDataResponse> getCurrentParsedData(
+            @AuthenticationPrincipal UserPrincipal principal) {
+        User user = userRepository.findById(principal.getId())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        return ResponseEntity.ok(cvUploadService.getCurrentParsedData(user));
     }
 
     @GetMapping
@@ -146,7 +166,15 @@ public class CvUploadController {
                 .mimeType(cv.getMimeType())
                 .isCurrent(cv.getIsCurrent())
                 .parseStatus(cv.getParseStatus())
+                .parseError("failed".equals(cv.getParseStatus()) ? cv.getRawText() : null)
                 .createdAt(cv.getCreatedAt())
                 .build();
+    }
+
+    private String truncateError(String errorMsg) {
+        if (errorMsg == null) {
+            return "Unknown AI parsing error";
+        }
+        return errorMsg.length() > 500 ? errorMsg.substring(0, 500) : errorMsg;
     }
 }

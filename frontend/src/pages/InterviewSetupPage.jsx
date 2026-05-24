@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "react-router-dom"
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { cvApi, interviewSessionApi, jobDescriptionApi, jobGroupApi } from "../services/api"
+import { cvApi, interviewSessionApi, jobDescriptionApi, jobGroupApi, aiHelpersApi } from "../services/api"
 import logo from "../assets/images/jobprep-logo.png"
 
 
@@ -65,6 +65,9 @@ export default function InterviewSetupPage() {
     const [keyRequirements, setKeyRequirements] = useState([])
     const [newRequirement, setNewRequirement] = useState("")
     const [isAnalyzingJD, setIsAnalyzingJD] = useState(false)
+    const [cvParseStatus, setCvParseStatus] = useState(null)
+    const [cvMatchResult, setCvMatchResult] = useState(null)
+    const [jdAnalyzeError, setJdAnalyzeError] = useState("")
     const [isStartingInterview, setIsStartingInterview] = useState(false)
     const [startError, setStartError] = useState("")
 
@@ -91,73 +94,57 @@ export default function InterviewSetupPage() {
     const availableCategories = selectedGroup ? selectedGroup.categories || [] : []
     const availableRoles = selectedCategory ? selectedCategory.roles || [] : []
 
-    const handleAIAnalyze = () => {
+    const handleAIAnalyze = async () => {
         if (!jobDescription || jobDescription.trim().length === 0) return
 
         setIsAnalyzingJD(true)
+        setJdAnalyzeError("")
+        setCvMatchResult(null)
 
-        setTimeout(() => {
-            const text = jobDescription.toLowerCase()
-            const commonKeywords = [
-                "react", "angular", "vue", "javascript", "typescript", "html", "css", "tailwind",
-                "java", "spring boot", "springboot", "hibernate", "jpa", "node.js", "nodejs", "express",
-                "python", "django", "flask", "fastapi", "golang", "go ", "c#", "dotnet", ".net",
-                "sql", "postgresql", "mysql", "mongodb", "redis", "docker", "kubernetes", "aws", "azure", "gcp",
-                "git", "ci/cd", "automation testing", "selenium", "manual testing", "qa", "agile", "scrum",
-                "machine learning", "deep learning", "ai", "nlp", "llm", "tensorflow", "pytorch",
-                "communication", "problem solving", "teamwork", "leadership", "english"
-            ]
-
-            const found = []
-            commonKeywords.forEach(kw => {
-                if (text.includes(kw)) {
-                    let display = kw.trim()
-                    if (display === "springboot") display = "Spring Boot"
-                    else if (display === "nodejs") display = "Node.js"
-                    else if (display === "dotnet") display = ".Net"
-                    else if (display === "gcp") display = "GCP"
-                    else if (display === "aws") display = "AWS"
-                    else if (display === "sql") display = "SQL"
-                    else if (display === "html") display = "HTML"
-                    else if (display === "css") display = "CSS"
-                    else if (display === "ci/cd") display = "CI/CD"
-                    else if (display === "qa") display = "QA"
-                    else if (display === "ai") display = "AI"
-                    else if (display === "nlp") display = "NLP"
-                    else if (display === "llm") display = "LLM"
-                    else {
-                        display = display.replace(/\b\w/g, c => c.toUpperCase())
-                    }
-                    if (!found.includes(display)) {
-                        found.push(display)
-                    }
-                }
+        try {
+            const res = await aiHelpersApi.checkCurrentCvJd({
+                job_description: jobDescription,
             })
+            const result = typeof res.data === "string" ? JSON.parse(res.data) : res.data
 
-            const bulletRegex = /(?:^|\n)\s*[-*•+]\s*(.*?)(?=\n|$)/g
-            let match
-            let bulletCount = 0
-            while ((match = bulletRegex.exec(jobDescription)) !== null && bulletCount < 5) {
-                const phrase = match[1].trim()
-                if (phrase.length > 5 && phrase.length < 50 && !found.includes(phrase)) {
-                    const capitalized = phrase.charAt(0).toUpperCase() + phrase.slice(1)
-                    found.push(capitalized)
-                    bulletCount++
-                }
+            setCvMatchResult(result)
+
+            const tags = []
+            if (Array.isArray(result.matched_skills)) {
+                result.matched_skills.forEach((skill) => tags.push(skill))
             }
-
-            if (found.length === 0) {
-                found.push("Good Communication", "Problem Solving", "Team player")
+            if (Array.isArray(result.missing_skills)) {
+                result.missing_skills.slice(0, 3).forEach((skill) => {
+                    if (!tags.includes(skill)) tags.push(skill)
+                })
             }
-
-            setKeyRequirements(found)
+            if (tags.length > 0) {
+                setKeyRequirements(tags)
+            }
+        } catch (err) {
+            console.error("JD analysis failed", err)
+            setJdAnalyzeError(
+                err?.response?.data?.message ||
+                "Unable to analyze CV against job description. Upload a PDF resume first, then try again."
+            )
+        } finally {
             setIsAnalyzingJD(false)
-        }, 1000)
+        }
     }
 
     const handleStartInterview = async () => {
         setIsStartingInterview(true)
         setStartError("")
+
+        const currentCv = cvs.find(c => c.isCurrent) || cvs[0]
+        if (currentCv && currentCv.parseStatus === "failed") {
+            setStartError(
+                currentCv.parseError ||
+                "Your resume could not be parsed by AI. Please re-upload a PDF before starting."
+            )
+            setIsStartingInterview(false)
+            return
+        }
 
         let finalJdId = null
         try {
@@ -175,10 +162,15 @@ export default function InterviewSetupPage() {
             const createSessionRes = await interviewSessionApi.create({
                 jobDescriptionId: finalJdId,
             })
+            const startSessionRes = await interviewSessionApi.start(createSessionRes.data.id, {
+                interviewType: selectedType,
+                interviewLevel: selectedLevel,
+                numQuestions: 5,
+            })
 
             const setupState = {
-                sessionId: createSessionRes.data.id,
-                sessionStatus: createSessionRes.data.status,
+                sessionId: startSessionRes.data.id,
+                sessionStatus: startSessionRes.data.status,
                 jobDescription,
                 selectedGroup: selectedGroup?.name || "",
                 selectedCategory: selectedCategory?.name || "",
@@ -187,13 +179,15 @@ export default function InterviewSetupPage() {
                 selectedLevel,
                 selectedType,
                 keyRequirements,
-                jdId: finalJdId
+                jdId: finalJdId,
+                aiStarted: true
             }
             localStorage.setItem("interview_setup", JSON.stringify(setupState))
-            navigate(`/live-interview?sessionId=${createSessionRes.data.id}`)
+            navigate(`/live-interview?sessionId=${startSessionRes.data.id}`)
         } catch (err) {
             console.error("Failed to start interview session", err)
-            setStartError("Unable to start the interview. Please try again or check your connection.")
+            const msg = err?.response?.data?.message || err?.response?.data || "Unable to start the interview. Please try again or check your connection."
+            setStartError(typeof msg === "string" ? msg : JSON.stringify(msg))
         } finally {
             setIsStartingInterview(false)
         }
@@ -214,26 +208,43 @@ export default function InterviewSetupPage() {
         const file = e.target.files[0]
         if (!file) return
 
+        const ext = file.name.split(".").pop()?.toLowerCase()
+        if (ext !== "pdf") {
+            setStartError("Please upload a PDF resume. The AI parser supports PDF format.")
+            return
+        }
+
         setIsScanning(true)
         setScanProgress(0)
         setCvName(file.name)
         setIsAutoSelected(false)
+        setCvParseStatus(null)
+        setStartError("")
 
-        // Progress simulation
         const interval = setInterval(() => {
             setScanProgress(p => p < 90 ? p + 5 : p)
         }, 200)
 
         try {
-            await cvApi.upload(file)
+            const uploadRes = await cvApi.upload(file)
             clearInterval(interval)
             setScanProgress(100)
+            setCvParseStatus(uploadRes.data.parseStatus)
             await fetchCvs()
-            completeAIScan()
+
+            if (uploadRes.data.parseStatus === "failed") {
+                setStartError(
+                    uploadRes.data.parseError ||
+                    "CV uploaded but AI parsing failed. Please verify the AI service URL in backend config."
+                )
+            }
         } catch (err) {
             console.error("Upload failed", err)
+            setStartError("CV upload failed. Please try again.")
             setIsScanning(false)
             clearInterval(interval)
+        } finally {
+            setIsScanning(false)
         }
     }
 
@@ -262,40 +273,6 @@ export default function InterviewSetupPage() {
             console.error("Selection failed", err)
         }
     }
-
-    const completeAIScan = () => {
-        setTimeout(() => {
-            if (groups.length > 0) {
-                const randomGroup = groups[Math.floor(Math.random() * groups.length)]
-                setSelectedGroup(randomGroup)
-                
-                if (randomGroup.categories && randomGroup.categories.length > 0) {
-                    const randomCategory = randomGroup.categories[Math.floor(Math.random() * randomGroup.categories.length)]
-                    setSelectedCategory(randomCategory)
-
-                    if (randomCategory.roles && randomCategory.roles.length > 0) {
-                        const randomRole = randomCategory.roles[Math.floor(Math.random() * randomCategory.roles.length)]
-                        setSelectedRole(randomRole)
-                    } else {
-                        setSelectedRole(null)
-                    }
-                } else {
-                    setSelectedCategory(null)
-                    setSelectedRole(null)
-                }
-            }
-
-            const randomLevel = experienceLevels[Math.floor(Math.random() * experienceLevels.length)].label
-            const randomType = interviewTypes[Math.floor(Math.random() * interviewTypes.length)].label
-
-            setSelectedLevel(randomLevel)
-            setSelectedType(randomType)
-
-            setIsScanning(false)
-            setIsAutoSelected(true)
-        }, 500)
-    }
-
     return (
         <div className="min-h-screen bg-gray-50 font-display flex flex-col">
 
@@ -343,7 +320,7 @@ export default function InterviewSetupPage() {
                                 ref={fileInputRef}
                                 onChange={handleFileUpload}
                                 className="hidden"
-                                accept=".pdf,.doc,.docx"
+                                accept=".pdf"
                             />
 
                             <AnimatePresence mode="wait">
@@ -386,7 +363,7 @@ export default function InterviewSetupPage() {
                                                 {cvName ? cvName : "Drag and drop your file here"}
                                             </p>
                                             <p className="text-sm text-gray-400 mt-1">or click to browse</p>
-                                            <p className="text-[11px] text-gray-400 mt-4 font-medium uppercase tracking-wider">Supported formats: PDF, DOC, DOCX (Max size: 10MB)</p>
+                                            <p className="text-[11px] text-gray-400 mt-4 font-medium uppercase tracking-wider">Supported format: PDF (Max size: 10MB)</p>
                                         </div>
                                     </motion.div>
                                 )}
@@ -440,7 +417,18 @@ export default function InterviewSetupPage() {
                                             </div>
                                             <div>
                                                 <p className="text-base font-bold text-gray-900 line-clamp-1">{cv.fileName}</p>
-                                                <p className="text-xs text-gray-400 font-medium font-sans">Uploaded: {new Date(cv.createdAt).toLocaleDateString()}</p>
+                                                <p className="text-xs text-gray-400 font-medium font-sans">
+                                                    Uploaded: {new Date(cv.createdAt).toLocaleDateString()}
+                                                    {cv.parseStatus === "completed" && (
+                                                        <span className="ml-2 text-green-600 font-bold">· AI Parsed</span>
+                                                    )}
+                                                    {cv.parseStatus === "failed" && (
+                                                        <span className="ml-2 text-red-500 font-bold">· Parse Failed</span>
+                                                    )}
+                                                    {cv.parseStatus === "pending" && (
+                                                        <span className="ml-2 text-amber-500 font-bold">· Parsing...</span>
+                                                    )}
+                                                </p>
                                             </div>
                                         </div>
                                         
@@ -498,8 +486,9 @@ export default function InterviewSetupPage() {
                                         <button
                                             type="button"
                                             onClick={handleAIAnalyze}
-                                            disabled={isAnalyzingJD}
-                                            className="text-xs font-bold text-primary hover:underline flex items-center gap-1"
+                                            disabled={isAnalyzingJD || cvs.length === 0}
+                                            className="text-xs font-bold text-primary hover:underline flex items-center gap-1 disabled:opacity-50 disabled:no-underline"
+                                            title={cvs.length === 0 ? "Upload a CV first" : ""}
                                         >
                                             {isAnalyzingJD ? (
                                                 <>
@@ -523,6 +512,29 @@ export default function InterviewSetupPage() {
                                     </button>
                                 </div>
                             </div>
+
+                            {jdAnalyzeError && (
+                                <p className="text-xs text-red-500 mt-2">{jdAnalyzeError}</p>
+                            )}
+
+                            {cvMatchResult && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 6 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="mt-4 p-4 rounded-xl bg-primary/5 border border-primary/20"
+                                >
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-xs font-bold text-primary uppercase tracking-wider">CV-JD Match Score</span>
+                                        <span className="text-lg font-black text-primary">{cvMatchResult.match_score ?? "—"}%</span>
+                                    </div>
+                                    {cvMatchResult.analysis && (
+                                        <p className="text-xs text-gray-600 mb-2">{cvMatchResult.analysis}</p>
+                                    )}
+                                    {cvMatchResult.recommendation && (
+                                        <p className="text-xs text-gray-500 italic">{cvMatchResult.recommendation}</p>
+                                    )}
+                                </motion.div>
+                            )}
 
                             {/* Requirements Tags */}
                             {keyRequirements.length > 0 && (

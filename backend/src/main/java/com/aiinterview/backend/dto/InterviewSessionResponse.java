@@ -23,6 +23,8 @@ public class InterviewSessionResponse {
     private List<String> weaknesses;
     private String summaryText;
     private String nextSteps;
+    private String aiStatus;
+    private String aiMessage;
     private LocalDateTime createdAt;
     private List<InterviewQuestionResponse> questions;
 }
