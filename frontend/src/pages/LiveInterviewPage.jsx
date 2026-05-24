@@ -288,9 +288,9 @@ export default function LiveInterviewPage() {
 
     const completeInterviewSession = async () => {
         try {
-            await interviewSessionApi.complete(sessionId)
+            const completeRes = await interviewSessionApi.complete(sessionId)
             localStorage.removeItem("interview_setup")
-            navigate("/interview-result")
+            navigate("/interview-result", { state: { session: completeRes.data } })
         } catch (err) {
             console.error("Failed to complete interview session", err)
             setPermissionError("Unable to finish the interview. Please try again.")
@@ -302,7 +302,14 @@ export default function LiveInterviewPage() {
 
         await submitCurrentAnswer()
 
-        if (questionNum < totalQuestions) {
+        // After submitting, session has been refreshed inside submitCurrentAnswer
+        // The new question was saved to DB and returned in the updated session
+        const latestSession = await interviewSessionApi.get(sessionId)
+        const updatedSession = latestSession.data
+        setSession(updatedSession)
+
+        const availableQuestions = updatedSession?.questions?.length || DEFAULT_TOTAL_QUESTIONS
+        if (questionNum < availableQuestions) {
             transcriptRef.current = ""
             setQuestionNum((q) => q + 1)
             startQuestionCapture()
@@ -326,7 +333,8 @@ export default function LiveInterviewPage() {
             setPermissionError("")
         } catch (err) {
             console.error("Failed to start interview session", err)
-            setPermissionError("Unable to start the interview session. Please refresh and try again.")
+            const msg = err?.response?.data?.message || err?.response?.data || "Unable to start the interview session. Please refresh and try again."
+            setPermissionError(typeof msg === "string" ? msg : JSON.stringify(msg))
         }
     }
 

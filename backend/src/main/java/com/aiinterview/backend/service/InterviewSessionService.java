@@ -63,19 +63,25 @@ public class InterviewSessionService {
         User user = session.getUser();
 
         List<CvUpload> cvs = cvUploadRepository.findByUserAndDeletedAtIsNullOrderByCreatedAtDesc(user);
-        if (cvs.isEmpty() || cvs.get(0).getParsedData() == null) {
-            throw new AppException("Please upload and let AI extract your CV before starting.");
+        Object cvDataObj = new HashMap<>();
+        if (!cvs.isEmpty() && cvs.get(0).getParsedData() != null) {
+            try {
+                JsonNode cvDataNode = objectMapper.readTree(cvs.get(0).getParsedData());
+                if (cvDataNode.has("data")) {
+                    cvDataObj = cvDataNode.get("data");
+                } else {
+                    cvDataObj = cvDataNode;
+                }
+            } catch (Exception e) {
+                log.warn("Could not parse CV data, using empty object");
+            }
+        } else {
+            log.info("No CV data available, starting interview with empty cv_data");
         }
-        CvUpload latestCv = cvs.get(0);
 
         try {
-            JsonNode cvDataNode = objectMapper.readTree(latestCv.getParsedData());
-            if (cvDataNode.has("data")) {
-                cvDataNode = cvDataNode.get("data");
-            }
-
             Map<String, Object> req = new HashMap<>();
-            req.put("cv_data", cvDataNode);
+            req.put("cv_data", cvDataObj);
             if (session.getJobDescription() != null) {
                 req.put("job_description", session.getJobDescription().getJobDescriptionText());
             } else {
@@ -86,7 +92,18 @@ public class InterviewSessionService {
             req.put("num_questions", 5);
             req.put("passing_score", 0);
 
-            String aiResponse = aiApiClient.startInterview(req);
+            String aiResponse;
+            try {
+                aiResponse = aiApiClient.startInterview(req);
+            } catch (Exception aiEx) {
+                log.warn("AI server unreachable, starting session with fallback questions: {}", aiEx.getMessage());
+                session.setStatus(InterviewStatus.IN_PROGRESS);
+                session.setStartTime(LocalDateTime.now());
+                InterviewSession saved = sessionRepository.save(session);
+                List<InterviewQuestion> fallbackQuestions = createFallbackQuestions(saved);
+                return buildResponse(saved, fallbackQuestions);
+            }
+
             JsonNode resNode = objectMapper.readTree(aiResponse);
 
             if (resNode.has("status") && "rejected".equals(resNode.get("status").asText())) {
@@ -117,9 +134,30 @@ public class InterviewSessionService {
         } catch (AppException e) {
             throw e;
         } catch (Exception e) {
-            log.error("AI API Error", e);
-            throw new AppException("Failed to communicate with AI API: " + e.getMessage());
+            log.error("Unexpected error in startSession", e);
+            throw new AppException("Failed to start interview: " + e.getMessage());
         }
+    }
+
+    private List<InterviewQuestion> createFallbackQuestions(InterviewSession session) {
+        List<String> defaults = List.of(
+                "Tell me about yourself and your background.",
+                "What is your greatest professional achievement?",
+                "Describe a challenging problem you solved and how you approached it.",
+                "Where do you see yourself in the next 3-5 years?",
+                "Do you have any questions for us?");
+        List<InterviewQuestion> saved = new ArrayList<>();
+        for (int i = 0; i < defaults.size(); i++) {
+            InterviewQuestion q = InterviewQuestion.builder()
+                    .session(session)
+                    .questionText(defaults.get(i))
+                    .aiQuestionId("fallback-q" + (i + 1))
+                    .questionSource(QuestionSource.AI_GENERATED)
+                    .orderIndex(i + 1)
+                    .build();
+            saved.add(questionRepository.save(q));
+        }
+        return saved;
     }
 
     @Transactional

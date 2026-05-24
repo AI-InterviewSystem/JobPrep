@@ -23,25 +23,15 @@ public class AiApiClient {
 
     private final RestTemplate restTemplate = new RestTemplate();
 
-    @Value("${ai.api.key}")
-    private String apiKey;
-
     @Value("${ai.server.url}")
     private String aiServerUrl;
 
-    private HttpHeaders createHeaders() {
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("X-Gemini-Api-Key", apiKey);
-        return headers;
-    }
-
     public String extractCv(MultipartFile file) {
         try {
-            HttpHeaders headers = createHeaders();
+            HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.MULTIPART_FORM_DATA);
 
             MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-            // Wrap multipart file into ByteArrayResource for RestTemplate
             ByteArrayResource resource = new ByteArrayResource(file.getBytes()) {
                 @Override
                 public String getFilename() {
@@ -66,7 +56,7 @@ public class AiApiClient {
 
     public String startInterview(Map<String, Object> requestBody) {
         try {
-            HttpHeaders headers = createHeaders();
+            HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
 
             HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);
@@ -85,7 +75,7 @@ public class AiApiClient {
 
     public String submitAnswer(Map<String, Object> requestBody) {
         try {
-            HttpHeaders headers = createHeaders();
+            HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
 
             HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);
@@ -104,7 +94,7 @@ public class AiApiClient {
 
     public String getSummary(Map<String, Object> requestBody) {
         try {
-            HttpHeaders headers = createHeaders();
+            HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
 
             HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);
@@ -123,7 +113,7 @@ public class AiApiClient {
 
     public String checkCvJd(Map<String, Object> requestBody) {
         try {
-            HttpHeaders headers = createHeaders();
+            HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);
             ResponseEntity<String> response = restTemplate.postForEntity(
@@ -147,7 +137,7 @@ public class AiApiClient {
 
     private String sendMultipartWithJobDescription(MultipartFile file, String jobDescription, String endpoint) {
         try {
-            HttpHeaders headers = createHeaders();
+            HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.MULTIPART_FORM_DATA);
             MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
             ByteArrayResource resource = new ByteArrayResource(file.getBytes()) {
@@ -172,7 +162,7 @@ public class AiApiClient {
 
     public String generateQuestions(Map<String, Object> requestBody) {
         try {
-            HttpHeaders headers = createHeaders();
+            HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);
             ResponseEntity<String> response = restTemplate.postForEntity(
