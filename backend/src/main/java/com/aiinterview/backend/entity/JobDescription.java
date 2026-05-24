@@ -22,10 +22,6 @@ public class JobDescription {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "job_category_id")
-    private JobCategory category;
-
     @Column(name = "job_description_text", nullable = false, columnDefinition = "text")
     private String jobDescriptionText;
 

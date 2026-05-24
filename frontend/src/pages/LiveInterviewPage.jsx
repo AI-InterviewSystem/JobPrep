@@ -6,7 +6,6 @@ import { interviewSessionApi, profileApi } from "../services/api"
 const DEFAULT_TOTAL_QUESTIONS = 5
 const INITIAL_QUESTION = 1
 
-const defaultQuestion = `"Can you describe a challenging project you've worked on recently and specifically how you handled the communication with difficult stakeholders?"`
 const aiMessage = `AI: "Thank you for that background. Now, regarding your experience..."`
 
 export default function LiveInterviewPage() {
@@ -200,7 +199,7 @@ export default function LiveInterviewPage() {
         return `${m}:${s}`
     }
 
-    const currentQuestionText = session?.questions?.[questionNum - 1]?.questionText || defaultQuestion
+    const currentQuestionText = session?.questions?.[questionNum - 1]?.questionText || "Waiting for the AI interviewer to generate the next question..."
     const totalQuestions = DEFAULT_TOTAL_QUESTIONS
     const progressPct = ((questionNum - 1) / totalQuestions) * 100
 
@@ -257,7 +256,10 @@ export default function LiveInterviewPage() {
 
     const submitCurrentAnswer = async () => {
         const currentQuestion = session?.questions?.[questionNum - 1]
-        if (!currentQuestion) return
+        if (!currentQuestion) {
+            setPermissionError("No AI question is available for this session. Please restart from the setup page.")
+            return false
+        }
 
         setIsSubmittingAnswer(true)
         setRecordingError("")
@@ -278,9 +280,12 @@ export default function LiveInterviewPage() {
             setSession(updated.data)
             transcriptRef.current = ""
             setCurrentTranscript("")
+            return true
         } catch (err) {
             console.error("Failed to submit answer", err)
-            setPermissionError("Unable to save your answer. Please try again.")
+            const msg = err?.response?.data?.message || err?.response?.data || "Unable to save your answer. Please try again."
+            setPermissionError(typeof msg === "string" ? msg : JSON.stringify(msg))
+            return false
         } finally {
             setIsSubmittingAnswer(false)
         }
@@ -300,7 +305,8 @@ export default function LiveInterviewPage() {
     const handleNext = async () => {
         if (isSubmittingAnswer) return
 
-        await submitCurrentAnswer()
+        const submitted = await submitCurrentAnswer()
+        if (!submitted) return
 
         // After submitting, session has been refreshed inside submitCurrentAnswer
         // The new question was saved to DB and returned in the updated session
@@ -321,13 +327,40 @@ export default function LiveInterviewPage() {
     const handleEndInterview = async () => {
         if (isSubmittingAnswer) return
 
-        await submitCurrentAnswer()
+        const submitted = await submitCurrentAnswer()
+        if (!submitted) return
         await completeInterviewSession()
     }
 
     const startInterviewSession = async (id) => {
         try {
-            const startRes = await interviewSessionApi.start(id)
+            const currentSessionRes = await interviewSessionApi.get(id)
+            if (
+                currentSessionRes.data?.status === "IN_PROGRESS" &&
+                Array.isArray(currentSessionRes.data?.questions) &&
+                currentSessionRes.data.questions.length > 0
+            ) {
+                setSession(currentSessionRes.data)
+                setSessionStarted(true)
+                setPermissionError("")
+                return
+            }
+
+            let setup = null
+            const stored = localStorage.getItem("interview_setup")
+            if (stored) {
+                try {
+                    setup = JSON.parse(stored)
+                } catch {
+                    setup = null
+                }
+            }
+
+            const startRes = await interviewSessionApi.start(id, {
+                interviewType: setup?.selectedType || "Technical",
+                interviewLevel: setup?.selectedLevel || "Junior",
+                numQuestions: 5,
+            })
             setSession(startRes.data)
             setSessionStarted(true)
             setPermissionError("")

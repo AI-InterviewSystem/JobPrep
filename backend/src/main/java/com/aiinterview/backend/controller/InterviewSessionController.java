@@ -2,6 +2,7 @@ package com.aiinterview.backend.controller;
 
 import com.aiinterview.backend.dto.CreateInterviewSessionRequest;
 import com.aiinterview.backend.dto.InterviewSessionResponse;
+import com.aiinterview.backend.dto.StartInterviewSessionRequest;
 import com.aiinterview.backend.dto.SubmitAnswerRequest;
 import com.aiinterview.backend.service.InterviewSessionService;
 import lombok.RequiredArgsConstructor;
@@ -43,8 +44,9 @@ public class InterviewSessionController {
     @PostMapping("/{id}/start")
     public ResponseEntity<InterviewSessionResponse> startSession(
             Authentication auth,
-            @PathVariable UUID id) {
-        return ResponseEntity.ok(interviewSessionService.startSession(id, auth.getName()));
+            @PathVariable UUID id,
+            @RequestBody(required = false) StartInterviewSessionRequest request) {
+        return ResponseEntity.ok(interviewSessionService.startSession(id, auth.getName(), request));
     }
 
     @PostMapping("/{id}/answers")

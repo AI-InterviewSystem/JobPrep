@@ -2,11 +2,9 @@ package com.aiinterview.backend.service;
 
 import com.aiinterview.backend.dto.JobDescriptionRequest;
 import com.aiinterview.backend.dto.JobDescriptionResponse;
-import com.aiinterview.backend.entity.JobCategory;
 import com.aiinterview.backend.entity.JobDescription;
 import com.aiinterview.backend.entity.User;
 import com.aiinterview.backend.exception.AppException;
-import com.aiinterview.backend.repository.JobCategoryRepository;
 import com.aiinterview.backend.repository.JobDescriptionRepository;
 import com.aiinterview.backend.repository.UserRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -27,17 +25,11 @@ import java.util.stream.Collectors;
 public class JobDescriptionService {
 
     private final JobDescriptionRepository jobDescriptionRepository;
-    private final JobCategoryRepository jobCategoryRepository;
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
 
     @Transactional
     public JobDescriptionResponse create(JobDescriptionRequest request, UUID userId) {
-        JobCategory category = null;
-        if (request.getJobCategoryId() != null) {
-            category = jobCategoryRepository.findById(request.getJobCategoryId())
-                    .orElseThrow(() -> new AppException("Job category not found"));
-        }
 
         User user = null;
         if (userId != null) {
@@ -55,7 +47,6 @@ public class JobDescriptionService {
         }
 
         JobDescription jobDescription = JobDescription.builder()
-                .category(category)
                 .jobDescriptionText(request.getJobDescriptionText())
                 .keyRequirements(keyRequirementsJson)
                 .createdBy(user)
@@ -107,7 +98,8 @@ public class JobDescriptionService {
         List<String> keyReqs = new ArrayList<>();
         if (jd.getKeyRequirements() != null) {
             try {
-                keyReqs = objectMapper.readValue(jd.getKeyRequirements(), new TypeReference<List<String>>() {});
+                keyReqs = objectMapper.readValue(jd.getKeyRequirements(), new TypeReference<List<String>>() {
+                });
             } catch (Exception e) {
                 log.error("Failed to deserialize key requirements from JSON", e);
             }
@@ -115,8 +107,6 @@ public class JobDescriptionService {
 
         return JobDescriptionResponse.builder()
                 .id(jd.getId())
-                .jobCategoryId(jd.getCategory() != null ? jd.getCategory().getId() : null)
-                .jobCategoryName(jd.getCategory() != null ? jd.getCategory().getName() : null)
                 .jobDescriptionText(jd.getJobDescriptionText())
                 .keyRequirements(keyReqs)
                 .createdBy(jd.getCreatedBy() != null ? jd.getCreatedBy().getId() : null)

@@ -15,8 +15,6 @@ import java.util.UUID;
 @AllArgsConstructor
 public class JobDescriptionResponse {
     private UUID id;
-    private UUID jobCategoryId;
-    private String jobCategoryName;
     private String jobDescriptionText;
     private List<String> keyRequirements;
     private UUID createdBy;

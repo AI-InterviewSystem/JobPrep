@@ -1,7 +1,6 @@
 package com.aiinterview.backend.service;
 
 import com.aiinterview.backend.dto.AdminDashboardResponse;
-import com.aiinterview.backend.entity.User;
 import com.aiinterview.backend.repository.PaymentRepository;
 import com.aiinterview.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -11,7 +10,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 

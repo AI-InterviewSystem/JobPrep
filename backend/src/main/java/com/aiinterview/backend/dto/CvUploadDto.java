@@ -16,5 +16,6 @@ public class CvUploadDto {
     private String mimeType;
     private Boolean isCurrent;
     private String parseStatus;
+    private String parseError;
     private LocalDateTime createdAt;
 }

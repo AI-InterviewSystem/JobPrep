@@ -1,11 +1,17 @@
 package com.aiinterview.backend.controller;
 
+import com.aiinterview.backend.entity.User;
+import com.aiinterview.backend.repository.UserRepository;
 import com.aiinterview.backend.service.AiApiClient;
+import com.aiinterview.backend.service.CvUploadService;
+import com.aiinterview.backend.service.UserPrincipal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -14,10 +20,30 @@ import java.util.Map;
 public class AiHelperController {
 
     private final AiApiClient aiApiClient;
+    private final CvUploadService cvUploadService;
+    private final UserRepository userRepository;
 
     @PostMapping("/check-cv-jd")
     public ResponseEntity<String> checkCvJd(@RequestBody Map<String, Object> body) {
         return ResponseEntity.ok(aiApiClient.checkCvJd(body));
+    }
+
+    @PostMapping("/check-current-cv-jd")
+    public ResponseEntity<String> checkCurrentCvJd(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @RequestBody Map<String, Object> body) {
+        User user = userRepository.findById(principal.getId())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        String jobDescription = body.get("job_description") != null
+                ? body.get("job_description").toString()
+                : "";
+
+        Map<String, Object> request = new HashMap<>();
+        request.put("cv_data", cvUploadService.getCvDataForAi(user));
+        request.put("job_description", jobDescription);
+
+        return ResponseEntity.ok(aiApiClient.checkCvJd(request));
     }
 
     @PostMapping("/check-cv-jd-file")
