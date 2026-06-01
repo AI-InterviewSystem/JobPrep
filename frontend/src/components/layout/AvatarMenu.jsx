@@ -128,8 +128,18 @@ export default function AvatarMenu() {
             {open && (
                 <div
                     role="menu"
-                    className="absolute right-0 mt-3 w-44 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-xl"
+                className="absolute right-0 mt-3 w-44 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-xl"
                 >
+                    {user?.role !== "ADMIN" && (
+                        <Link
+                            to="/interview-history"
+                            role="menuitem"
+                            onClick={() => setOpen(false)}
+                            className="block px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                            Interview History
+                        </Link>
+                    )}
                     <Link
                         to={profileLink}
                         role="menuitem"
@@ -138,6 +148,7 @@ export default function AvatarMenu() {
                     >
                         Profile
                     </Link>
+                    
                     <button
                         type="button"
                         role="menuitem"

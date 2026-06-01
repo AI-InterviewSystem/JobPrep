@@ -18,7 +18,19 @@ public class InterviewSessionResponse {
     private InterviewStatus status;
     private LocalDateTime startTime;
     private LocalDateTime endTime;
+    private String title;
+    private String interviewType;
+    private String roleSnapshot;
+    private String levelSnapshot;
+    private Integer totalQuestions;
+    private Integer completedQuestions;
+    private Integer durationSeconds;
     private BigDecimal overallScore;
+    private BigDecimal technicalScore;
+    private BigDecimal communicationScore;
+    private BigDecimal confidenceScore;
+    private BigDecimal problemSolvingScore;
+    private BigDecimal clarityScore;
     private List<String> strengths;
     private List<String> weaknesses;
     private String summaryText;
@@ -26,5 +38,6 @@ public class InterviewSessionResponse {
     private String aiStatus;
     private String aiMessage;
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
     private List<InterviewQuestionResponse> questions;
 }
