@@ -62,6 +62,74 @@ public class DatabaseInitialization {
         }
 
         try {
+            jdbcTemplate.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto");
+            jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS job_groups (
+                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                        name VARCHAR(255) UNIQUE NOT NULL,
+                        description TEXT,
+                        is_active BOOLEAN DEFAULT true,
+                        created_at TIMESTAMPTZ DEFAULT now(),
+                        updated_at TIMESTAMPTZ DEFAULT now()
+                    )
+                    """);
+            jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS job_categories (
+                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                        group_id UUID REFERENCES job_groups(id),
+                        name VARCHAR(255) NOT NULL,
+                        description TEXT,
+                        is_active BOOLEAN DEFAULT true,
+                        created_at TIMESTAMPTZ DEFAULT now(),
+                        updated_at TIMESTAMPTZ DEFAULT now(),
+                        UNIQUE(group_id, name)
+                    )
+                    """);
+            jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS job_roles (
+                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                        category_id UUID NOT NULL REFERENCES job_categories(id),
+                        name VARCHAR(255) NOT NULL,
+                        description TEXT,
+                        is_active BOOLEAN DEFAULT true,
+                        created_at TIMESTAMPTZ DEFAULT now(),
+                        updated_at TIMESTAMPTZ DEFAULT now(),
+                        UNIQUE(category_id, name)
+                    )
+                    """);
+            log.info("Ensured job management tables exist");
+        } catch (Exception e) {
+            log.warn("Could not create job management tables: {}", e.getMessage());
+        }
+
+        try {
+            jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS question_bank (
+                        id SERIAL PRIMARY KEY,
+                        category_id UUID REFERENCES job_categories(id),
+                        role_id UUID REFERENCES job_roles(id),
+                        question_text TEXT NOT NULL,
+                        difficulty VARCHAR(20),
+                        question_type VARCHAR(30),
+                        suggested_duration INTEGER DEFAULT 120,
+                        tags TEXT[],
+                        is_active BOOLEAN DEFAULT true,
+                        created_at TIMESTAMPTZ DEFAULT now(),
+                        updated_at TIMESTAMPTZ DEFAULT now(),
+                        deleted_at TIMESTAMPTZ
+                    )
+                    """);
+            jdbcTemplate.execute("ALTER TABLE question_bank ADD COLUMN IF NOT EXISTS category_id UUID REFERENCES job_categories(id)");
+            jdbcTemplate.execute("ALTER TABLE question_bank ADD COLUMN IF NOT EXISTS role_id UUID REFERENCES job_roles(id)");
+            jdbcTemplate.execute("ALTER TABLE question_bank ADD COLUMN IF NOT EXISTS question_type VARCHAR(30)");
+            jdbcTemplate.execute("ALTER TABLE question_bank ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ");
+            jdbcTemplate.execute("UPDATE question_bank SET deleted_at = NULL WHERE deleted_at IS NOT NULL");
+            log.info("Ensured question_bank table exists");
+        } catch (Exception e) {
+            log.warn("Could not create question_bank table: {}", e.getMessage());
+        }
+
+        try {
             jdbcTemplate.execute("""
                     CREATE TABLE IF NOT EXISTS interview_recordings (
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

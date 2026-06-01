@@ -15,6 +15,12 @@ api.interceptors.request.use(
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
+        if (import.meta.env.DEV && config.url?.startsWith('/admin/')) {
+            console.debug('[JobPrep API]', config.method?.toUpperCase(), config.url, {
+                hasToken: Boolean(token),
+                hasAuthorization: Boolean(config.headers.Authorization),
+            });
+        }
         return config;
     },
     (error) => Promise.reject(error)
@@ -25,7 +31,8 @@ api.interceptors.response.use(
     (error) => {
         const status = error?.response?.status;
         const requestUrl = error?.config?.url || '';
-        if (status === 401 && !requestUrl.startsWith('/auth/')) {
+        const skipAuthRedirect = Boolean(error?.config?.skipAuthRedirect);
+        if (status === 401 && !requestUrl.startsWith('/auth/') && !skipAuthRedirect) {
             storage.clearAuth();
             window.dispatchEvent(new Event('jobprep:user-updated'));
             if (!window.location.pathname.includes('/login')) {
@@ -111,17 +118,27 @@ export const adminUsersApi = {
 };
 
 export const adminJobsApi = {
-    getGroups: () => api.get('/admin/jobs/groups'),
-    createGroup: (data) => api.post('/admin/jobs/groups', data),
-    updateGroup: (id, data) => api.put(`/admin/jobs/groups/${id}`, data),
-    deleteGroup: (id) => api.delete(`/admin/jobs/groups/${id}`),
-    getCategories: () => api.get('/admin/jobs/categories'),
-    createCategory: (data) => api.post('/admin/jobs/categories', data),
-    updateCategory: (id, data) => api.put(`/admin/jobs/categories/${id}`, data),
-    deleteCategory: (id) => api.delete(`/admin/jobs/categories/${id}`),
-    createRole: (data) => api.post('/admin/jobs/roles', data),
-    updateRole: (id, data) => api.put(`/admin/jobs/roles/${id}`, data),
-    deleteRole: (id) => api.delete(`/admin/jobs/roles/${id}`),
+    getGroups: () => api.get('/admin/jobs/groups', { skipAuthRedirect: true }),
+    createGroup: (data) => api.post('/admin/jobs/groups', data, { skipAuthRedirect: true }),
+    updateGroup: (id, data) => api.put(`/admin/jobs/groups/${id}`, data, { skipAuthRedirect: true }),
+    deleteGroup: (id) => api.delete(`/admin/jobs/groups/${id}`, { skipAuthRedirect: true }),
+    getCategories: (params) => api.get('/admin/jobs/categories', { params, skipAuthRedirect: true }),
+    createCategory: (data) => api.post('/admin/jobs/categories', data, { skipAuthRedirect: true }),
+    updateCategory: (id, data) => api.put(`/admin/jobs/categories/${id}`, data, { skipAuthRedirect: true }),
+    deleteCategory: (id) => api.delete(`/admin/jobs/categories/${id}`, { skipAuthRedirect: true }),
+    getRoles: (params) => api.get('/admin/jobs/roles', { params, skipAuthRedirect: true }),
+    createRole: (data) => api.post('/admin/jobs/roles', data, { skipAuthRedirect: true }),
+    updateRole: (id, data) => api.put(`/admin/jobs/roles/${id}`, data, { skipAuthRedirect: true }),
+    deleteRole: (id) => api.delete(`/admin/jobs/roles/${id}`, { skipAuthRedirect: true }),
+};
+
+export const adminQuestionBankApi = {
+    getAll: (params) => api.get('/admin/question-bank', { params, skipAuthRedirect: true }),
+    create: (data) => api.post('/admin/question-bank', data, { skipAuthRedirect: true }),
+    update: (id, data) => api.put(`/admin/question-bank/${id}`, data, { skipAuthRedirect: true }),
+    delete: (id) => api.delete(`/admin/question-bank/${id}`, { skipAuthRedirect: true }),
+    setActive: (id, isActive) => api.patch(`/admin/question-bank/${id}/active`, { isActive }, { skipAuthRedirect: true }),
+    import: (data) => api.post('/admin/question-bank/import', data, { skipAuthRedirect: true }),
 };
 
 export const adminPromosApi = {
@@ -132,10 +149,10 @@ export const adminPromosApi = {
 };
 
 export const adminExperienceLevelsApi = {
-    getAll: () => api.get('/admin/experience-levels'),
-    create: (data) => api.post('/admin/experience-levels', data),
-    update: (id, data) => api.put(`/admin/experience-levels/${id}`, data),
-    delete: (id) => api.delete(`/admin/experience-levels/${id}`),
+    getAll: () => api.get('/admin/experience-levels', { skipAuthRedirect: true }),
+    create: (data) => api.post('/admin/experience-levels', data, { skipAuthRedirect: true }),
+    update: (id, data) => api.put(`/admin/experience-levels/${id}`, data, { skipAuthRedirect: true }),
+    delete: (id) => api.delete(`/admin/experience-levels/${id}`, { skipAuthRedirect: true }),
 };
 
 export const publicPricingPlansApi = {
