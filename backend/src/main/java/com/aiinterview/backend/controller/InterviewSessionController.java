@@ -12,9 +12,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -31,7 +34,7 @@ public class InterviewSessionController {
             Authentication auth,
             @RequestBody CreateInterviewSessionRequest request) {
         return ResponseEntity.ok(
-                interviewSessionService.createSession(auth.getName(), request.getJobDescriptionId())
+                interviewSessionService.createSession(auth.getName(), request)
         );
     }
 
@@ -43,8 +46,31 @@ public class InterviewSessionController {
     }
 
     @GetMapping
-    public ResponseEntity<List<InterviewSessionResponse>> getUserSessions(Authentication auth) {
-        return ResponseEntity.ok(interviewSessionService.getUserSessions(auth.getName()));
+    public ResponseEntity<List<InterviewSessionResponse>> getUserSessions(
+            Authentication auth,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+            @RequestParam(required = false) BigDecimal minScore,
+            @RequestParam(required = false) BigDecimal maxScore,
+            @RequestParam(required = false) String role,
+            @RequestParam(required = false) String level,
+            @RequestParam(required = false) String interviewType,
+            @RequestParam(required = false) String topic) {
+        return ResponseEntity.ok(interviewSessionService.searchUserSessions(
+                auth.getName(),
+                keyword,
+                status,
+                fromDate,
+                toDate,
+                minScore,
+                maxScore,
+                role,
+                level,
+                interviewType,
+                topic
+        ));
     }
 
     @PostMapping("/{id}/start")

@@ -43,6 +43,16 @@ const interviewTypes = [
     },
 ]
 
+function inferRoleFromJobDescription(text) {
+    if (!text?.trim()) return ""
+    const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean)
+    const markerLine = lines.find(line => /^(position|role|title|vi tri|vị trí)\s*:/i.test(line))
+    if (markerLine) {
+        return markerLine.replace(/^(position|role|title|vi tri|vị trí)\s*:/i, "").trim().slice(0, 100)
+    }
+    return (lines[0] || "").slice(0, 100)
+}
+
 export default function InterviewSetupPage() {
     const navigate = useNavigate()
     const [selectedLevel, setSelectedLevel] = useState("Intern")
@@ -179,6 +189,8 @@ export default function InterviewSetupPage() {
 
             const createSessionRes = await interviewSessionApi.create({
                 jobDescriptionId: finalJdId,
+                roleSnapshot: inferRoleFromJobDescription(jobDescription),
+                title: inferRoleFromJobDescription(jobDescription) || `${selectedType} ${selectedLevel} Interview`,
             })
             const startSessionRes = await interviewSessionApi.start(createSessionRes.data.id, {
                 interviewType: selectedType,

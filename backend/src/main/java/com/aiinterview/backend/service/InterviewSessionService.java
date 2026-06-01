@@ -14,6 +14,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -26,7 +28,6 @@ public class InterviewSessionService {
     private final InterviewSessionRepository sessionRepository;
     private final InterviewQuestionRepository questionRepository;
     private final InterviewAnswerRepository answerRepository;
-    private final AnswerAnalysisRepository answerAnalysisRepository;
     private final InterviewRecordingRepository recordingRepository;
     private final UserRepository userRepository;
     private final JobDescriptionRepository jobDescriptionRepository;
@@ -36,17 +37,32 @@ public class InterviewSessionService {
     private final ObjectMapper objectMapper;
 
     @Transactional
-    public InterviewSessionResponse createSession(String userEmail, UUID jobDescriptionId) {
+    public InterviewSessionResponse createSession(String userEmail, CreateInterviewSessionRequest request) {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new AppException("User not found"));
+        UUID jobDescriptionId = request != null ? request.getJobDescriptionId() : null;
 
         InterviewSession session = InterviewSession.builder()
                 .user(user)
                 .status(InterviewStatus.CREATED)
+                .title(cleanBlank(request != null ? request.getTitle() : null))
+                .roleSnapshot(cleanBlank(request != null ? request.getRoleSnapshot() : null))
+                .retryOfSessionId(request != null ? request.getRetryOfSessionId() : null)
                 .build();
 
         if (jobDescriptionId != null) {
-            jobDescriptionRepository.findById(jobDescriptionId).ifPresent(session::setJobDescription);
+            jobDescriptionRepository.findById(jobDescriptionId).ifPresent(jobDescription -> {
+                session.setJobDescription(jobDescription);
+                if (session.getRoleSnapshot() == null) {
+                    session.setRoleSnapshot(inferRoleFromJobDescription(jobDescription.getJobDescriptionText()));
+                }
+                if (session.getTitle() == null) {
+                    session.setTitle(buildSessionTitle(session.getRoleSnapshot(), null));
+                }
+            });
+        }
+        if (session.getTitle() == null) {
+            session.setTitle(buildSessionTitle(session.getRoleSnapshot(), null));
         }
 
         InterviewSession saved = sessionRepository.save(session);
@@ -107,6 +123,14 @@ public class InterviewSessionService {
             session.setAiSessionId(resNode.has("session_id") ? resNode.get("session_id").asText() : null);
             session.setStatus(InterviewStatus.IN_PROGRESS);
             session.setStartTime(LocalDateTime.now());
+            session.setInterviewType(interviewType);
+            session.setLevelSnapshot(interviewLevel);
+            session.setTotalQuestions(numQuestions);
+            session.setCompletedQuestions(0);
+            if (session.getRoleSnapshot() == null && session.getJobDescription() != null) {
+                session.setRoleSnapshot(inferRoleFromJobDescription(session.getJobDescription().getJobDescriptionText()));
+            }
+            session.setTitle(buildSessionTitle(session.getRoleSnapshot(), interviewLevel));
             InterviewSession saved = sessionRepository.save(session);
 
             JsonNode nextQ = resNode.get("next_question");
@@ -209,9 +233,7 @@ public class InterviewSessionService {
             }
 
             InterviewAnswer savedAnswer = answerRepository.save(answer);
-            if (resNode.has("evaluation") && !resNode.get("evaluation").isNull()) {
-                saveAnswerAnalysis(savedAnswer, resNode.get("evaluation"), resNode);
-            }
+            updateQuestionProgress(session);
 
             JsonNode nextQ = resNode.get("next_question");
             if (nextQ != null && !nextQ.isNull()) {
@@ -223,6 +245,7 @@ public class InterviewSessionService {
                     sessionId);
             answer.setFeedback("AI evaluation is temporarily unavailable because the AI provider is rate-limited. This answer was saved and can be reviewed later.");
             InterviewAnswer savedAnswer = answerRepository.save(answer);
+            updateQuestionProgress(session);
             createFallbackQuestionIfNeeded(session, question, "AI provider rate-limited");
             return SubmitAnswerResponse.builder().answerId(savedAnswer.getId()).build();
         } catch (AiApiClient.AiProviderInvalidResponseException e) {
@@ -230,6 +253,7 @@ public class InterviewSessionService {
                     sessionId);
             answer.setFeedback("AI evaluation is temporarily unavailable because the AI service returned an invalid response. This answer was saved and can be reviewed later.");
             InterviewAnswer savedAnswer = answerRepository.save(answer);
+            updateQuestionProgress(session);
             createFallbackQuestionIfNeeded(session, question, "AI response invalid");
             return SubmitAnswerResponse.builder().answerId(savedAnswer.getId()).build();
         } catch (Exception e) {
@@ -254,6 +278,11 @@ public class InterviewSessionService {
                 if (finalRes.has("overall_score")) {
                     session.setOverallScore(new BigDecimal(finalRes.get("overall_score").asText()));
                 }
+                session.setTechnicalScore(decimalFromFirst(finalRes, "technical_score", "technical"));
+                session.setCommunicationScore(decimalFromFirst(finalRes, "communication_score", "communication"));
+                session.setConfidenceScore(decimalFromFirst(finalRes, "confidence_score", "confidence"));
+                session.setProblemSolvingScore(decimalFromFirst(finalRes, "problem_solving_score", "problem_solving"));
+                session.setClarityScore(decimalFromFirst(finalRes, "clarity_score", "clarity"));
                 if (finalRes.has("summary")) {
                     session.setSummaryText(finalRes.get("summary").asText());
                 }
@@ -276,6 +305,7 @@ public class InterviewSessionService {
 
             session.setStatus(InterviewStatus.COMPLETED);
             session.setEndTime(LocalDateTime.now());
+            updateSessionCompletionMetrics(session, questionRepository.findBySessionIdOrderByOrderIndexAsc(sessionId));
             InterviewSession saved = sessionRepository.save(session);
 
             List<InterviewQuestion> questions = questionRepository.findBySessionIdOrderByOrderIndexAsc(sessionId);
@@ -310,11 +340,38 @@ public class InterviewSessionService {
 
     @Transactional(readOnly = true)
     public List<InterviewSessionResponse> getUserSessions(String userEmail) {
+        return searchUserSessions(userEmail, null, null, null, null, null, null, null, null, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<InterviewSessionResponse> searchUserSessions(
+            String userEmail,
+            String keyword,
+            String status,
+            LocalDate fromDate,
+            LocalDate toDate,
+            BigDecimal minScore,
+            BigDecimal maxScore,
+            String role,
+            String level,
+            String interviewType,
+            String topic) {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new AppException("User not found"));
-        return sessionRepository.findByUserIdOrderByCreatedAtDesc(user.getId())
+        return sessionRepository.searchHistory(
+                        user.getId(),
+                        cleanBlank(keyword),
+                        cleanBlank(status),
+                        fromDate,
+                        toDate,
+                        minScore,
+                        maxScore,
+                        cleanBlank(role),
+                        cleanBlank(level),
+                        cleanBlank(interviewType),
+                        cleanBlank(topic)
+                )
                 .stream()
-                .filter(s -> s.getDeletedAt() == null)
                 .map(s -> buildResponse(s, Collections.emptyList()))
                 .collect(Collectors.toList());
     }
@@ -398,6 +455,7 @@ public class InterviewSessionService {
         session.setNextSteps(aiStatus + ": Retry the interview summary later after the AI provider is available, or review the saved answers manually.");
         session.setStatus(InterviewStatus.COMPLETED);
         session.setEndTime(LocalDateTime.now());
+        updateSessionCompletionMetrics(session, questions);
 
         InterviewSession saved = sessionRepository.save(session);
         return buildResponse(saved, questions);
@@ -433,7 +491,19 @@ public class InterviewSessionService {
                 .status(session.getStatus())
                 .startTime(session.getStartTime())
                 .endTime(session.getEndTime())
+                .title(session.getTitle())
+                .interviewType(session.getInterviewType())
+                .roleSnapshot(session.getRoleSnapshot())
+                .levelSnapshot(session.getLevelSnapshot())
+                .totalQuestions(session.getTotalQuestions())
+                .completedQuestions(session.getCompletedQuestions())
+                .durationSeconds(session.getDurationSeconds())
                 .overallScore(session.getOverallScore())
+                .technicalScore(session.getTechnicalScore())
+                .communicationScore(session.getCommunicationScore())
+                .confidenceScore(session.getConfidenceScore())
+                .problemSolvingScore(session.getProblemSolvingScore())
+                .clarityScore(session.getClarityScore())
                 .strengths(session.getStrengths())
                 .weaknesses(session.getWeaknesses())
                 .summaryText(session.getSummaryText())
@@ -441,6 +511,7 @@ public class InterviewSessionService {
                 .aiStatus(resolveAiStatus(session, questions))
                 .aiMessage(resolveAiMessage(session, questions))
                 .createdAt(session.getCreatedAt())
+                .updatedAt(session.getUpdatedAt())
                 .questions(qDtos)
                 .build();
     }
@@ -466,70 +537,115 @@ public class InterviewSessionService {
                 .build();
     }
 
-    private void saveAnswerAnalysis(InterviewAnswer answer, JsonNode evaluation, JsonNode aiResponse) {
-        answerAnalysisRepository.findById(answer.getId()).ifPresent(answerAnalysisRepository::delete);
-
-        AnswerAnalysis analysis = AnswerAnalysis.builder()
-                .answer(answer)
-                .overallScore(decimalFrom(evaluation, "score"))
-                .clarityScore(decimalFrom(evaluation, "clarity_score"))
-                .relevanceScore(decimalFrom(evaluation, "relevance_score"))
-                .feedbackSummary(textFrom(evaluation, "feedback"))
-                .suggestedImprovements(listFromFirstArray(evaluation, "suggested_improvements", "improvement_suggestions"))
-                .strengths(listFromArray(evaluation, "strengths"))
-                .weaknesses(listFromArray(evaluation, "weaknesses"))
-                .improvedAnswer(textFrom(evaluation, "improved_answer"))
-                .isAnswerRelevant(evaluation.has("is_answer_relevant") ? evaluation.get("is_answer_relevant").asBoolean() : null)
-                .modelName(textFrom(aiResponse, "model_name"))
-                .promptVersion(textFrom(aiResponse, "prompt_version"))
-                .latencyMs(intFrom(aiResponse, "latency_ms"))
-                .build();
-
-        answerAnalysisRepository.save(analysis);
+    private void updateQuestionProgress(InterviewSession session) {
+        List<InterviewQuestion> questions = questionRepository.findBySessionIdOrderByOrderIndexAsc(session.getId());
+        List<InterviewAnswer> answers = answerRepository.findByQuestionSessionId(session.getId());
+        session.setCompletedQuestions(answers.size());
+        if (session.getTotalQuestions() == null || session.getTotalQuestions() < questions.size()) {
+            session.setTotalQuestions(questions.size());
+        }
+        sessionRepository.save(session);
     }
 
-    private BigDecimal decimalFrom(JsonNode node, String fieldName) {
-        if (node == null || !node.has(fieldName) || node.get(fieldName).isNull()) {
-            return null;
+    private void updateSessionCompletionMetrics(InterviewSession session, List<InterviewQuestion> questions) {
+        List<InterviewAnswer> answers = answerRepository.findByQuestionSessionId(session.getId());
+        session.setCompletedQuestions(answers.size());
+        if (session.getTotalQuestions() == null || session.getTotalQuestions() < questions.size()) {
+            session.setTotalQuestions(questions.size());
         }
-        try {
-            return new BigDecimal(node.get(fieldName).asText());
-        } catch (NumberFormatException e) {
-            return null;
+        if (session.getStartTime() != null && session.getEndTime() != null) {
+            long seconds = Duration.between(session.getStartTime(), session.getEndTime()).getSeconds();
+            session.setDurationSeconds((int) Math.max(0, Math.min(Integer.MAX_VALUE, seconds)));
         }
+        applyFallbackSkillScores(session, answers);
     }
 
-    private Integer intFrom(JsonNode node, String fieldName) {
-        if (node == null || !node.has(fieldName) || node.get(fieldName).isNull()) {
-            return null;
+    private void applyFallbackSkillScores(InterviewSession session, List<InterviewAnswer> answers) {
+        BigDecimal average = answers.stream()
+                .map(InterviewAnswer::getScore)
+                .filter(Objects::nonNull)
+                .map(BigDecimal::valueOf)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        long scoredCount = answers.stream().map(InterviewAnswer::getScore).filter(Objects::nonNull).count();
+        if (scoredCount == 0) {
+            return;
         }
-        return node.get(fieldName).asInt();
+        BigDecimal score = average.divide(BigDecimal.valueOf(scoredCount), 2, java.math.RoundingMode.HALF_UP);
+        if (session.getTechnicalScore() == null) session.setTechnicalScore(score);
+        if (session.getCommunicationScore() == null) session.setCommunicationScore(score);
+        if (session.getConfidenceScore() == null) session.setConfidenceScore(score);
+        if (session.getProblemSolvingScore() == null) session.setProblemSolvingScore(score);
+        if (session.getClarityScore() == null) session.setClarityScore(score);
     }
 
-    private String textFrom(JsonNode node, String fieldName) {
-        if (node == null || !node.has(fieldName) || node.get(fieldName).isNull()) {
+    private BigDecimal decimalFromFirst(JsonNode node, String... fieldNames) {
+        if (node == null) {
             return null;
         }
-        return node.get(fieldName).asText();
-    }
-
-    private List<String> listFromFirstArray(JsonNode node, String... fieldNames) {
         for (String fieldName : fieldNames) {
-            List<String> values = listFromArray(node, fieldName);
-            if (values != null && !values.isEmpty()) {
-                return values;
+            if (node.has(fieldName) && !node.get(fieldName).isNull()) {
+                try {
+                    return new BigDecimal(node.get(fieldName).asText());
+                } catch (NumberFormatException ignored) {
+                    return null;
+                }
             }
         }
         return null;
     }
 
-    private List<String> listFromArray(JsonNode node, String fieldName) {
-        if (node == null || !node.has(fieldName) || !node.get(fieldName).isArray()) {
+    private String cleanBlank(String value) {
+        if (value == null || value.isBlank()) {
             return null;
         }
-        List<String> values = new ArrayList<>();
-        node.get(fieldName).forEach(value -> values.add(value.asText()));
-        return values;
+        return value.trim();
+    }
+
+    private String buildSessionTitle(String role, String level) {
+        String cleanRole = cleanBlank(role);
+        String cleanLevel = cleanBlank(level);
+        if (cleanRole != null && cleanLevel != null) {
+            return cleanRole + " - " + cleanLevel;
+        }
+        if (cleanRole != null) {
+            return cleanRole;
+        }
+        if (cleanLevel != null) {
+            return cleanLevel + " Interview";
+        }
+        return "Mock Interview";
+    }
+
+    private String inferRoleFromJobDescription(String jobDescriptionText) {
+        String text = cleanBlank(jobDescriptionText);
+        if (text == null) {
+            return null;
+        }
+
+        String lower = text.toLowerCase(Locale.ROOT);
+        for (String marker : List.of("position:", "role:", "title:", "vị trí:", "vi tri:")) {
+            int index = lower.indexOf(marker);
+            if (index >= 0) {
+                String candidate = text.substring(index + marker.length()).lines().findFirst().orElse("").trim();
+                if (!candidate.isBlank()) {
+                    return truncate(candidate, 100);
+                }
+            }
+        }
+
+        return text.lines()
+                .map(String::trim)
+                .filter(line -> !line.isBlank())
+                .findFirst()
+                .map(line -> truncate(line, 100))
+                .orElse(null);
+    }
+
+    private String truncate(String value, int maxLength) {
+        if (value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, maxLength);
     }
 
     private String resolveAiStatus(InterviewSession session, List<InterviewQuestion> questions) {
