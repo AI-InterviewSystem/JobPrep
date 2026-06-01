@@ -3,6 +3,8 @@ package com.aiinterview.backend.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.GenericGenerator;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
@@ -37,6 +39,20 @@ public class AdminAction {
 
     @Column(columnDefinition = "text")
     private String reason;
+
+    @Column(name = "target_table", length = 100)
+    private String targetTable;
+
+    @Column(name = "target_id")
+    private UUID targetId;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "old_data", columnDefinition = "jsonb")
+    private String oldData;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "new_data", columnDefinition = "jsonb")
+    private String newData;
 
     @CreatedDate
     @Column(name = "performed_at", updatable = false)

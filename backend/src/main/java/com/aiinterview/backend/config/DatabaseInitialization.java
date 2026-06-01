@@ -32,6 +32,16 @@ public class DatabaseInitialization {
         }
 
         try {
+            jdbcTemplate.execute("ALTER TABLE admin_actions ADD COLUMN IF NOT EXISTS target_table VARCHAR(100)");
+            jdbcTemplate.execute("ALTER TABLE admin_actions ADD COLUMN IF NOT EXISTS target_id UUID");
+            jdbcTemplate.execute("ALTER TABLE admin_actions ADD COLUMN IF NOT EXISTS old_data JSONB");
+            jdbcTemplate.execute("ALTER TABLE admin_actions ADD COLUMN IF NOT EXISTS new_data JSONB");
+            log.info("Ensured admin action audit columns exist");
+        } catch (Exception e) {
+            log.warn("Could not update admin_actions audit columns: {}", e.getMessage());
+        }
+
+        try {
             jdbcTemplate.execute("ALTER TABLE interview_sessions ADD COLUMN IF NOT EXISTS title VARCHAR(255)");
             jdbcTemplate.execute("ALTER TABLE interview_sessions ADD COLUMN IF NOT EXISTS interview_type VARCHAR(50) DEFAULT 'mock'");
             jdbcTemplate.execute("ALTER TABLE interview_sessions ADD COLUMN IF NOT EXISTS role_snapshot VARCHAR(100)");
