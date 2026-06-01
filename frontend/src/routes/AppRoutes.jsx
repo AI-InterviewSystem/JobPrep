@@ -25,6 +25,8 @@ import AdminReportsPage from "../pages/AdminReportsPage"
 import AdminPricingPlansPage from "../pages/AdminPricingPlansPage"
 import AdminPromosPage from "../pages/AdminPromosPage"
 import AdminExperienceLevelsPage from "../pages/AdminExperienceLevelsPage"
+import AdminJobsPage from "../pages/AdminJobsPage"
+import AdminQuestionBankPage from "../pages/AdminQuestionBankPage"
 import CheckoutPage from "../pages/CheckoutPage"
 import AdminLayout from "../layouts/AdminLayout"
 import PaymentResultPage from "../pages/PaymentResultPage"
@@ -90,6 +92,8 @@ export default function AppRoutes() {
                         <Route path="users" element={<AdminUsersPage />} />
                         <Route path="interviews" element={<AdminInterviewSessionsPage />} />
                         <Route path="reports" element={<AdminReportsPage />} />
+                        <Route path="jobs" element={<AdminJobsPage />} />
+                        <Route path="question-bank" element={<AdminQuestionBankPage />} />
                         <Route path="experience-levels" element={<AdminExperienceLevelsPage />} />
                         <Route path="promos" element={<AdminPromosPage />} />
                         <Route path="pricing-plans" element={<AdminPricingPlansPage />} />
