@@ -50,5 +50,33 @@ public class DatabaseInitialization {
         } catch (Exception e) {
             log.warn("Could not create interview_recordings table: {}", e.getMessage());
         }
+
+        try {
+            jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS answer_analysis (
+                        answer_id UUID PRIMARY KEY REFERENCES interview_answers(id) ON DELETE CASCADE,
+                        overall_score DECIMAL(5,2),
+                        clarity_score DECIMAL(5,2),
+                        relevance_score DECIMAL(5,2),
+                        feedback_summary TEXT,
+                        suggested_improvements JSONB,
+                        strengths JSONB,
+                        weaknesses JSONB,
+                        improved_answer TEXT,
+                        is_answer_relevant BOOLEAN,
+                        model_name VARCHAR(100),
+                        prompt_version VARCHAR(50),
+                        latency_ms INTEGER,
+                        analyzed_at TIMESTAMPTZ DEFAULT now()
+                    )
+                    """);
+            jdbcTemplate.execute("ALTER TABLE answer_analysis ADD COLUMN IF NOT EXISTS strengths JSONB");
+            jdbcTemplate.execute("ALTER TABLE answer_analysis ADD COLUMN IF NOT EXISTS weaknesses JSONB");
+            jdbcTemplate.execute("ALTER TABLE answer_analysis ADD COLUMN IF NOT EXISTS improved_answer TEXT");
+            jdbcTemplate.execute("ALTER TABLE answer_analysis ADD COLUMN IF NOT EXISTS is_answer_relevant BOOLEAN");
+            log.info("Ensured answer_analysis table exists");
+        } catch (Exception e) {
+            log.warn("Could not create answer_analysis table: {}", e.getMessage());
+        }
     }
 }
