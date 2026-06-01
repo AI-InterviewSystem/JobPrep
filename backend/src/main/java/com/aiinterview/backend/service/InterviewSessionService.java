@@ -26,6 +26,7 @@ public class InterviewSessionService {
     private final InterviewSessionRepository sessionRepository;
     private final InterviewQuestionRepository questionRepository;
     private final InterviewAnswerRepository answerRepository;
+    private final AnswerAnalysisRepository answerAnalysisRepository;
     private final InterviewRecordingRepository recordingRepository;
     private final UserRepository userRepository;
     private final JobDescriptionRepository jobDescriptionRepository;
@@ -208,6 +209,9 @@ public class InterviewSessionService {
             }
 
             InterviewAnswer savedAnswer = answerRepository.save(answer);
+            if (resNode.has("evaluation") && !resNode.get("evaluation").isNull()) {
+                saveAnswerAnalysis(savedAnswer, resNode.get("evaluation"), resNode);
+            }
 
             JsonNode nextQ = resNode.get("next_question");
             if (nextQ != null && !nextQ.isNull()) {
@@ -460,6 +464,72 @@ public class InterviewSessionService {
                 .isAnswerRelevant(answer.getIsAnswerRelevant())
                 .createdAt(answer.getCreatedAt())
                 .build();
+    }
+
+    private void saveAnswerAnalysis(InterviewAnswer answer, JsonNode evaluation, JsonNode aiResponse) {
+        answerAnalysisRepository.findById(answer.getId()).ifPresent(answerAnalysisRepository::delete);
+
+        AnswerAnalysis analysis = AnswerAnalysis.builder()
+                .answer(answer)
+                .overallScore(decimalFrom(evaluation, "score"))
+                .clarityScore(decimalFrom(evaluation, "clarity_score"))
+                .relevanceScore(decimalFrom(evaluation, "relevance_score"))
+                .feedbackSummary(textFrom(evaluation, "feedback"))
+                .suggestedImprovements(listFromFirstArray(evaluation, "suggested_improvements", "improvement_suggestions"))
+                .strengths(listFromArray(evaluation, "strengths"))
+                .weaknesses(listFromArray(evaluation, "weaknesses"))
+                .improvedAnswer(textFrom(evaluation, "improved_answer"))
+                .isAnswerRelevant(evaluation.has("is_answer_relevant") ? evaluation.get("is_answer_relevant").asBoolean() : null)
+                .modelName(textFrom(aiResponse, "model_name"))
+                .promptVersion(textFrom(aiResponse, "prompt_version"))
+                .latencyMs(intFrom(aiResponse, "latency_ms"))
+                .build();
+
+        answerAnalysisRepository.save(analysis);
+    }
+
+    private BigDecimal decimalFrom(JsonNode node, String fieldName) {
+        if (node == null || !node.has(fieldName) || node.get(fieldName).isNull()) {
+            return null;
+        }
+        try {
+            return new BigDecimal(node.get(fieldName).asText());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private Integer intFrom(JsonNode node, String fieldName) {
+        if (node == null || !node.has(fieldName) || node.get(fieldName).isNull()) {
+            return null;
+        }
+        return node.get(fieldName).asInt();
+    }
+
+    private String textFrom(JsonNode node, String fieldName) {
+        if (node == null || !node.has(fieldName) || node.get(fieldName).isNull()) {
+            return null;
+        }
+        return node.get(fieldName).asText();
+    }
+
+    private List<String> listFromFirstArray(JsonNode node, String... fieldNames) {
+        for (String fieldName : fieldNames) {
+            List<String> values = listFromArray(node, fieldName);
+            if (values != null && !values.isEmpty()) {
+                return values;
+            }
+        }
+        return null;
+    }
+
+    private List<String> listFromArray(JsonNode node, String fieldName) {
+        if (node == null || !node.has(fieldName) || !node.get(fieldName).isArray()) {
+            return null;
+        }
+        List<String> values = new ArrayList<>();
+        node.get(fieldName).forEach(value -> values.add(value.asText()));
+        return values;
     }
 
     private String resolveAiStatus(InterviewSession session, List<InterviewQuestion> questions) {
