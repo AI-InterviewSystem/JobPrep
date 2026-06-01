@@ -1,14 +1,19 @@
 package com.aiinterview.backend.controller;
 
 import com.aiinterview.backend.dto.CreateInterviewSessionRequest;
+import com.aiinterview.backend.dto.InterviewRecordingResponse;
 import com.aiinterview.backend.dto.InterviewSessionResponse;
 import com.aiinterview.backend.dto.StartInterviewSessionRequest;
 import com.aiinterview.backend.dto.SubmitAnswerRequest;
+import com.aiinterview.backend.dto.SubmitAnswerResponse;
+import com.aiinterview.backend.service.InterviewRecordingService;
 import com.aiinterview.backend.service.InterviewSessionService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
@@ -19,6 +24,7 @@ import java.util.UUID;
 public class InterviewSessionController {
 
     private final InterviewSessionService interviewSessionService;
+    private final InterviewRecordingService interviewRecordingService;
 
     @PostMapping
     public ResponseEntity<InterviewSessionResponse> createSession(
@@ -50,12 +56,33 @@ public class InterviewSessionController {
     }
 
     @PostMapping("/{id}/answers")
-    public ResponseEntity<Void> submitAnswer(
+    public ResponseEntity<SubmitAnswerResponse> submitAnswer(
             Authentication auth,
             @PathVariable UUID id,
             @RequestBody SubmitAnswerRequest request) {
-        interviewSessionService.submitAnswer(id, auth.getName(), request);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(interviewSessionService.submitAnswer(id, auth.getName(), request));
+    }
+
+    @PostMapping(value = "/{id}/recordings", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<InterviewRecordingResponse> uploadRecording(
+            Authentication auth,
+            @PathVariable UUID id,
+            @RequestParam UUID questionId,
+            @RequestParam(required = false) UUID answerId,
+            @RequestParam(required = false, defaultValue = "video") String recordingType,
+            @RequestParam(required = false) Integer durationSeconds,
+            @RequestParam(required = false) String transcriptText,
+            @RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(interviewRecordingService.uploadRecording(
+                id,
+                auth.getName(),
+                questionId,
+                answerId,
+                recordingType,
+                durationSeconds,
+                transcriptText,
+                file
+        ));
     }
 
     @PostMapping("/{id}/complete")

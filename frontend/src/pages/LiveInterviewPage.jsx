@@ -1,7 +1,7 @@
 import { useNavigate, useLocation } from "react-router-dom"
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { interviewSessionApi, profileApi } from "../services/api"
+import { interviewSessionApi } from "../services/api"
 
 const DEFAULT_TOTAL_QUESTIONS = 5
 const INITIAL_QUESTION = 1
@@ -100,12 +100,13 @@ export default function LiveInterviewPage() {
         if (!sessionStarted || !mediaStream) return
 
         if (!window.MediaRecorder) {
-            setRecordingError("Your browser does not support audio recording for this interview.")
+            setRecordingError("Your browser does not support recording for this interview.")
             return
         }
 
         try {
-            const recorder = new MediaRecorder(mediaStream, { mimeType: "audio/webm" })
+            const mimeType = getSupportedRecordingMimeType()
+            const recorder = new MediaRecorder(mediaStream, mimeType ? { mimeType } : undefined)
             recorder.ondataavailable = (event) => {
                 if (event.data && event.data.size > 0) {
                     audioChunksRef.current.push(event.data)
@@ -113,7 +114,7 @@ export default function LiveInterviewPage() {
             }
             recorder.onerror = (event) => {
                 console.error("MediaRecorder error", event)
-                setRecordingError("Audio recording failed. Your session will continue without a saved audio file.")
+                setRecordingError("Recording failed. Your session will continue without a saved video file.")
             }
 
             mediaRecorderRef.current = recorder
@@ -121,7 +122,7 @@ export default function LiveInterviewPage() {
             setRecordingError("")
             startQuestionCapture()
         } catch (err) {
-            console.error("Failed to initialize audio recorder", err)
+            console.error("Failed to initialize recorder", err)
             setRecordingError("Unable to initialize the interview recorder.")
         }
 
@@ -203,6 +204,17 @@ export default function LiveInterviewPage() {
     const totalQuestions = DEFAULT_TOTAL_QUESTIONS
     const progressPct = ((questionNum - 1) / totalQuestions) * 100
 
+    const getSupportedRecordingMimeType = () => {
+        if (!window.MediaRecorder || !MediaRecorder.isTypeSupported) return ""
+        const types = [
+            "video/webm;codecs=vp9,opus",
+            "video/webm;codecs=vp8,opus",
+            "video/webm",
+            "audio/webm",
+        ]
+        return types.find((type) => MediaRecorder.isTypeSupported(type)) || ""
+    }
+
     const startQuestionCapture = () => {
         if (!mediaRecorderRef.current || mediaRecorderRef.current.state !== "inactive") return
 
@@ -214,7 +226,7 @@ export default function LiveInterviewPage() {
             setIsRecording(true)
         } catch (err) {
             console.error("Failed to start recording", err)
-            setRecordingError("Unable to start audio capture for the current response.")
+            setRecordingError("Unable to start recording for the current response.")
         }
     }
 
@@ -226,7 +238,7 @@ export default function LiveInterviewPage() {
 
             const recorder = mediaRecorderRef.current
             recorder.onstop = () => {
-                const blob = new Blob(audioChunksRef.current, { type: audioChunksRef.current[0]?.type || "audio/webm" })
+                const blob = new Blob(audioChunksRef.current, { type: audioChunksRef.current[0]?.type || "video/webm" })
                 setIsRecording(false)
                 resolve(blob)
             }
@@ -239,17 +251,25 @@ export default function LiveInterviewPage() {
         return Math.max(0, Math.round((Date.now() - questionStartTimeRef.current) / 1000))
     }
 
-    const uploadAudioBlob = async (blob, questionId) => {
+    const uploadRecordingBlob = async (blob, questionId, answerId, durationSeconds, transcriptText) => {
         if (!blob || blob.size === 0) return null
 
-        const file = new File([blob], `interview-answer-${questionId}.webm`, { type: blob.type || "audio/webm" })
+        const isVideo = (blob.type || "").startsWith("video/")
+        const file = new File([blob], `interview-answer-${questionId}.webm`, { type: blob.type || "video/webm" })
+        const formData = new FormData()
+        formData.append("file", file)
+        formData.append("questionId", questionId)
+        if (answerId) formData.append("answerId", answerId)
+        formData.append("recordingType", isVideo ? "video" : "audio")
+        formData.append("durationSeconds", String(durationSeconds || 0))
+        formData.append("transcriptText", transcriptText || "")
 
         try {
-            const uploadRes = await profileApi.uploadFile(file)
-            return uploadRes.data.url
+            const uploadRes = await interviewSessionApi.uploadRecording(sessionId, formData)
+            return uploadRes.data
         } catch (err) {
-            console.error("Audio upload failed", err)
-            setRecordingError("Unable to save the answer audio file at this time.")
+            console.error("Recording upload failed", err)
+            setRecordingError("Unable to save the answer recording at this time.")
             return null
         }
     }
@@ -264,18 +284,19 @@ export default function LiveInterviewPage() {
         setIsSubmittingAnswer(true)
         setRecordingError("")
 
-        const audioBlob = await stopQuestionCapture()
-        const audioStoragePath = await uploadAudioBlob(audioBlob, currentQuestion.id)
+        const answerText = currentTranscript || ""
+        const durationSeconds = getCurrentQuestionDuration()
+        const recordingBlob = await stopQuestionCapture()
         const answerData = {
             questionId: currentQuestion.id,
-            answerText: currentTranscript || "",
-            inputType: audioStoragePath ? "AUDIO" : "TEXT",
-            durationSeconds: getCurrentQuestionDuration(),
-            audioStoragePath,
+            answerText,
+            inputType: recordingBlob && recordingBlob.size > 0 ? "VIDEO" : "TEXT",
+            durationSeconds,
         }
 
         try {
-            await interviewSessionApi.submitAnswer(sessionId, answerData)
+            const answerRes = await interviewSessionApi.submitAnswer(sessionId, answerData)
+            await uploadRecordingBlob(recordingBlob, currentQuestion.id, answerRes.data?.answerId, durationSeconds, answerText)
             const updated = await interviewSessionApi.get(sessionId)
             setSession(updated.data)
             transcriptRef.current = ""
@@ -510,7 +531,7 @@ export default function LiveInterviewPage() {
                             <div className="mt-5 rounded-2xl border border-gray-100 bg-slate-50 p-4">
                                 <div className="flex items-center justify-between mb-3 text-xs text-gray-500">
                                     <span>Your live answer transcript</span>
-                                    <span>{isRecording ? "Recording audio..." : "Listening..."}</span>
+                                    <span>{isRecording ? "Recording video..." : "Listening..."}</span>
                                 </div>
                                 <p className="min-h-[5rem] text-gray-700 text-sm leading-relaxed">
                                     {currentTranscript || "Speak clearly into your microphone. Your answer will appear here as you speak."}
@@ -519,7 +540,7 @@ export default function LiveInterviewPage() {
                                     <p className="mt-3 text-xs text-red-600">{recordingError}</p>
                                 )}
                                 {!supportSpeechRecognition && (
-                                    <p className="mt-3 text-xs text-amber-600">Speech recognition is unavailable in this browser. Audio capture will still save your response if supported.</p>
+                                    <p className="mt-3 text-xs text-amber-600">Speech recognition is unavailable in this browser. Recording will still save your response if supported.</p>
                                 )}
                             </div>
                         </motion.div>

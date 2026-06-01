@@ -148,6 +148,9 @@ export const interviewSessionApi = {
     list: () => api.get('/interview-sessions'),
     start: (id, data) => api.post(`/interview-sessions/${id}/start`, data || {}),
     submitAnswer: (id, data) => api.post(`/interview-sessions/${id}/answers`, data),
+    uploadRecording: (id, data) => api.post(`/interview-sessions/${id}/recordings`, data, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    }),
     complete: (id) => api.post(`/interview-sessions/${id}/complete`),
     delete: (id) => api.delete(`/interview-sessions/${id}`),
 };

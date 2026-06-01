@@ -23,6 +23,9 @@ public class FileService {
     @Value("${supabase.bucket.cvs}")
     private String cvBucket;
 
+    @Value("${supabase.storage.bucket:interview-recordings}")
+    private String recordingBucket;
+
     private final RestTemplate restTemplate = new RestTemplate();
 
     public String save(MultipartFile file) {
@@ -41,6 +44,24 @@ public class FileService {
         return saveToBucket(fileBytes, originalFilename, contentType, cvBucket);
     }
 
+    public StoredFile saveInterviewRecording(MultipartFile file, UUID sessionId, UUID questionId) {
+        try {
+            String extension = "";
+            String originalFilename = file.getOriginalFilename();
+            if (originalFilename != null && originalFilename.contains(".")) {
+                extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+            } else if ("video/webm".equalsIgnoreCase(file.getContentType()) || "audio/webm".equalsIgnoreCase(file.getContentType())) {
+                extension = ".webm";
+            }
+
+            String filePath = sessionId + "/" + questionId + "/" + UUID.randomUUID() + extension;
+            String publicUrl = saveToBucket(file.getBytes(), filePath, file.getContentType(), recordingBucket);
+            return new StoredFile(recordingBucket, filePath, publicUrl);
+        } catch (Exception e) {
+            throw new RuntimeException("Could not store the recording. Error: " + e.getMessage(), e);
+        }
+    }
+
     private String saveToBucket(MultipartFile file, String targetBucket) {
         try {
             return saveToBucket(file.getBytes(), file.getOriginalFilename(), file.getContentType(), targetBucket);
@@ -55,7 +76,9 @@ public class FileService {
             if (originalFilename != null && originalFilename.contains(".")) {
                 extension = originalFilename.substring(originalFilename.lastIndexOf("."));
             }
-            String filename = UUID.randomUUID().toString() + extension;
+            String filename = originalFilename != null && originalFilename.contains("/")
+                    ? originalFilename
+                    : UUID.randomUUID().toString() + extension;
             String uploadUrl = supabaseUrl + "/storage/v1/object/" + targetBucket + "/" + filename;
 
             HttpHeaders headers = new HttpHeaders();
@@ -77,6 +100,9 @@ public class FileService {
         } catch (Exception e) {
             throw new RuntimeException("Could not store the file. Error: " + e.getMessage());
         }
+    }
+
+    public record StoredFile(String bucketName, String filePath, String publicUrl) {
     }
 
     public void delete(String storagePath) {

@@ -4,6 +4,7 @@ import com.aiinterview.backend.entity.QuestionSource;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Getter
@@ -18,4 +19,6 @@ public class InterviewQuestionResponse {
     private String jobRequirementTag;
     private Integer orderIndex;
     private LocalDateTime createdAt;
+    private InterviewAnswerResponse answer;
+    private List<InterviewRecordingResponse> recordings;
 }

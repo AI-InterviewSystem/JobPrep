@@ -26,10 +26,12 @@ public class InterviewSessionService {
     private final InterviewSessionRepository sessionRepository;
     private final InterviewQuestionRepository questionRepository;
     private final InterviewAnswerRepository answerRepository;
+    private final InterviewRecordingRepository recordingRepository;
     private final UserRepository userRepository;
     private final JobDescriptionRepository jobDescriptionRepository;
     private final AiApiClient aiApiClient;
     private final CvUploadService cvUploadService;
+    private final InterviewRecordingService interviewRecordingService;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -160,20 +162,18 @@ public class InterviewSessionService {
     }
 
     @Transactional
-    public void submitAnswer(UUID sessionId, String userEmail, SubmitAnswerRequest request) {
+    public SubmitAnswerResponse submitAnswer(UUID sessionId, String userEmail, SubmitAnswerRequest request) {
         InterviewSession session = findSession(sessionId, userEmail);
 
         InterviewQuestion question = questionRepository.findById(request.getQuestionId())
                 .orElseThrow(() -> new AppException("Question not found"));
 
-        answerRepository.findAll().stream()
-                .filter(a -> a.getQuestion().getId().equals(question.getId()))
-                .findFirst()
-                .ifPresent(answerRepository::delete);
+        answerRepository.findFirstByQuestionId(question.getId()).ifPresent(answerRepository::delete);
 
         InterviewAnswer answer = InterviewAnswer.builder()
                 .question(question)
                 .answerText(request.getAnswerText())
+                .audioStoragePath(request.getAudioStoragePath())
                 .inputType(request.getInputType() != null ? request.getInputType() : InputType.TEXT)
                 .durationSeconds(request.getDurationSeconds())
                 .build();
@@ -207,24 +207,27 @@ public class InterviewSessionService {
                 }
             }
 
-            answerRepository.save(answer);
+            InterviewAnswer savedAnswer = answerRepository.save(answer);
 
             JsonNode nextQ = resNode.get("next_question");
             if (nextQ != null && !nextQ.isNull()) {
                 saveAiQuestion(session, nextQ, (question.getOrderIndex() != null ? question.getOrderIndex() : 0) + 1);
             }
+            return SubmitAnswerResponse.builder().answerId(savedAnswer.getId()).build();
         } catch (AiApiClient.AiProviderRateLimitException e) {
             log.warn("AI provider rate-limited while submitting answer for session {}. Saving answer and continuing with a predefined question.",
                     sessionId);
             answer.setFeedback("AI evaluation is temporarily unavailable because the AI provider is rate-limited. This answer was saved and can be reviewed later.");
-            answerRepository.save(answer);
+            InterviewAnswer savedAnswer = answerRepository.save(answer);
             createFallbackQuestionIfNeeded(session, question, "AI provider rate-limited");
+            return SubmitAnswerResponse.builder().answerId(savedAnswer.getId()).build();
         } catch (AiApiClient.AiProviderInvalidResponseException e) {
             log.warn("AI provider returned invalid answer response for session {}. Saving answer and continuing with a predefined question.",
                     sessionId);
             answer.setFeedback("AI evaluation is temporarily unavailable because the AI service returned an invalid response. This answer was saved and can be reviewed later.");
-            answerRepository.save(answer);
+            InterviewAnswer savedAnswer = answerRepository.save(answer);
             createFallbackQuestionIfNeeded(session, question, "AI response invalid");
+            return SubmitAnswerResponse.builder().answerId(savedAnswer.getId()).build();
         } catch (Exception e) {
             log.error("AI API Error", e);
             throw new AppException("Failed to communicate with AI API: " + e.getMessage());
@@ -397,6 +400,15 @@ public class InterviewSessionService {
     }
 
     private InterviewSessionResponse buildResponse(InterviewSession session, List<InterviewQuestion> questions) {
+        Map<UUID, InterviewAnswer> answersByQuestionId = answerRepository.findByQuestionSessionId(session.getId()).stream()
+                .filter(answer -> answer.getQuestion() != null)
+                .collect(Collectors.toMap(answer -> answer.getQuestion().getId(), answer -> answer, (first, second) -> second));
+        Map<UUID, List<InterviewRecording>> recordingsByQuestionId = recordingRepository
+                .findBySessionIdAndDeletedAtIsNullOrderByCreatedAtAsc(session.getId())
+                .stream()
+                .filter(recording -> recording.getQuestion() != null)
+                .collect(Collectors.groupingBy(recording -> recording.getQuestion().getId()));
+
         List<InterviewQuestionResponse> qDtos = questions.stream()
                 .map(q -> InterviewQuestionResponse.builder()
                         .id(q.getId())
@@ -405,6 +417,10 @@ public class InterviewSessionService {
                         .jobRequirementTag(q.getJobRequirementTag())
                         .orderIndex(q.getOrderIndex())
                         .createdAt(q.getCreatedAt())
+                        .answer(toAnswerResponse(answersByQuestionId.get(q.getId())))
+                        .recordings(recordingsByQuestionId.getOrDefault(q.getId(), Collections.emptyList()).stream()
+                                .map(interviewRecordingService::toResponse)
+                                .collect(Collectors.toList()))
                         .build())
                 .collect(Collectors.toList());
 
@@ -422,6 +438,27 @@ public class InterviewSessionService {
                 .aiMessage(resolveAiMessage(session, questions))
                 .createdAt(session.getCreatedAt())
                 .questions(qDtos)
+                .build();
+    }
+
+    private InterviewAnswerResponse toAnswerResponse(InterviewAnswer answer) {
+        if (answer == null) {
+            return null;
+        }
+        return InterviewAnswerResponse.builder()
+                .id(answer.getId())
+                .questionId(answer.getQuestion() != null ? answer.getQuestion().getId() : null)
+                .answerText(answer.getAnswerText())
+                .audioStoragePath(answer.getAudioStoragePath())
+                .durationSeconds(answer.getDurationSeconds())
+                .inputType(answer.getInputType())
+                .score(answer.getScore())
+                .feedback(answer.getFeedback())
+                .strengths(answer.getStrengths())
+                .weaknesses(answer.getWeaknesses())
+                .improvedAnswer(answer.getImprovedAnswer())
+                .isAnswerRelevant(answer.getIsAnswerRelevant())
+                .createdAt(answer.getCreatedAt())
                 .build();
     }
 
