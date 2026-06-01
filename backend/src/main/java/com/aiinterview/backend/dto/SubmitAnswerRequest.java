@@ -10,4 +10,5 @@ public class SubmitAnswerRequest {
     private String answerText;
     private InputType inputType;
     private Integer durationSeconds;
+    private String audioStoragePath;
 }

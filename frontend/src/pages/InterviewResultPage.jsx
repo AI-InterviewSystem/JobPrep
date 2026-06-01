@@ -47,6 +47,7 @@ export default function InterviewResultPage() {
     const SCORE = session?.overallScore ?? 0;
     const sessionStrengths = session?.strengths ?? [];
     const sessionAreas = session?.weaknesses ?? [];
+    const questions = Array.isArray(session?.questions) ? session.questions : [];
 
     return (
         <div className="min-h-screen bg-gray-50 font-display flex flex-col">
@@ -143,6 +144,42 @@ export default function InterviewResultPage() {
                         )}
                     </div>
                 </div>
+
+                {questions.length > 0 && (
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-8">
+                        <div className="flex items-center gap-2 mb-5">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                            <h2 className="font-bold text-gray-900 text-lg">Answer Recordings</h2>
+                        </div>
+                        <div className="space-y-5">
+                            {questions.map((question, index) => {
+                                const recording = question.recordings?.[0]
+                                return (
+                                    <div key={question.id || index} className="border border-gray-100 rounded-xl p-4">
+                                        <p className="text-xs font-bold text-primary uppercase tracking-widest mb-2">
+                                            Question {question.orderIndex || index + 1}
+                                        </p>
+                                        <p className="text-sm font-semibold text-gray-800 mb-3">{question.questionText}</p>
+                                        {recording?.publicUrl ? (
+                                            recording.recordingType === "audio" ? (
+                                                <audio controls src={recording.publicUrl} className="w-full" />
+                                            ) : (
+                                                <video controls src={recording.publicUrl} className="w-full max-h-[360px] rounded-lg bg-black" />
+                                            )
+                                        ) : (
+                                            <p className="text-sm text-gray-400 italic">No recording saved for this answer.</p>
+                                        )}
+                                        {question.answer?.answerText && (
+                                            <p className="mt-3 text-sm text-gray-600 whitespace-pre-line">{question.answer.answerText}</p>
+                                        )}
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+                )}
 
                 {/* Actions */}
                 <div className="flex items-center justify-center gap-4 flex-wrap pb-8">
