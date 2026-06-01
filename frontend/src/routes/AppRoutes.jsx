@@ -20,6 +20,8 @@ import InterviewHistoryPage from "../pages/InterviewHistoryPage"
 import OtpPage from "../pages/OtpPage"
 import AdminDashboard from "../pages/AdminDashboard"
 import AdminUsersPage from "../pages/AdminUsersPage"
+import AdminInterviewSessionsPage from "../pages/AdminInterviewSessionsPage"
+import AdminReportsPage from "../pages/AdminReportsPage"
 import AdminPricingPlansPage from "../pages/AdminPricingPlansPage"
 import AdminPromosPage from "../pages/AdminPromosPage"
 import AdminExperienceLevelsPage from "../pages/AdminExperienceLevelsPage"
@@ -86,6 +88,8 @@ export default function AppRoutes() {
                         <Route index element={<Navigate to="dashboard" replace />} />
                         <Route path="dashboard" element={<AdminDashboard />} />
                         <Route path="users" element={<AdminUsersPage />} />
+                        <Route path="interviews" element={<AdminInterviewSessionsPage />} />
+                        <Route path="reports" element={<AdminReportsPage />} />
                         <Route path="experience-levels" element={<AdminExperienceLevelsPage />} />
                         <Route path="promos" element={<AdminPromosPage />} />
                         <Route path="pricing-plans" element={<AdminPricingPlansPage />} />

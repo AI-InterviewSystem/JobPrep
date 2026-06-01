@@ -20,6 +20,22 @@ api.interceptors.request.use(
     (error) => Promise.reject(error)
 );
 
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        const status = error?.response?.status;
+        const requestUrl = error?.config?.url || '';
+        if (status === 401 && !requestUrl.startsWith('/auth/')) {
+            storage.clearAuth();
+            window.dispatchEvent(new Event('jobprep:user-updated'));
+            if (!window.location.pathname.includes('/login')) {
+                window.location.href = '/login';
+            }
+        }
+        return Promise.reject(error);
+    }
+);
+
 export const authApi = {
     register: (data) => api.post('/auth/register', data),
     login: (data) => api.post('/auth/login', data),
@@ -78,6 +94,14 @@ export const adminPricingPlansApi = {
 
 export const adminDashboardApi = {
     getStats: () => api.get('/admin/dashboard/stats')
+};
+
+export const adminInterviewApi = {
+    getSessions: (params) => api.get('/admin/interviews/sessions', { params }),
+    getSession: (id) => api.get(`/admin/interviews/sessions/${id}`),
+    getAnalytics: () => api.get('/admin/interviews/analytics'),
+    getReports: () => api.get('/admin/interviews/reports'),
+    exportReports: () => api.get('/admin/interviews/reports/export', { responseType: 'blob' }),
 };
 
 export const adminUsersApi = {

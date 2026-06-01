@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
-    FiSearch, FiTag, FiUsers, FiDollarSign, FiMoreHorizontal, FiTrendingUp, FiActivity
+    FiSearch, FiTag, FiUsers, FiDollarSign, FiMoreHorizontal, FiTrendingUp, FiActivity, FiFileText, FiMessageSquare
 } from 'react-icons/fi';
 import { adminDashboardApi } from '../services/api';
 import { 
@@ -74,7 +74,7 @@ export default function AdminDashboard() {
             className="space-y-6"
         >
             {/* Top Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6">
                 {/* Revenue Card */}
                 <div className="bg-white p-6 rounded-[2rem] shadow-sm flex items-center gap-5 border border-slate-50">
                     <div className="w-16 h-16 rounded-2xl bg-teal-500 flex items-center justify-center text-white shadow-lg shadow-teal-100">
@@ -91,6 +91,28 @@ export default function AdminDashboard() {
                                 </p>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-[2rem] shadow-sm flex items-center gap-5 border border-slate-50">
+                    <div className="w-16 h-16 rounded-2xl bg-indigo-500 flex items-center justify-center text-white shadow-lg shadow-indigo-100">
+                        <FiFileText className="text-2xl" />
+                    </div>
+                    <div className="flex-1">
+                        <h3 className="text-gray-400 font-bold text-sm mb-1 uppercase tracking-wider">Interviews</h3>
+                        <p className="text-2xl font-black text-gray-900">{formatNumber(stats.totalInterviewSessions || 0)}</p>
+                        <p className="text-xs text-gray-400 font-medium mt-1">{Number(stats.averageInterviewScore || 0).toFixed(1)} avg score</p>
+                    </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-[2rem] shadow-sm flex items-center gap-5 border border-slate-50">
+                    <div className="w-16 h-16 rounded-2xl bg-amber-500 flex items-center justify-center text-white shadow-lg shadow-amber-100">
+                        <FiMessageSquare className="text-2xl" />
+                    </div>
+                    <div className="flex-1">
+                        <h3 className="text-gray-400 font-bold text-sm mb-1 uppercase tracking-wider">Questions</h3>
+                        <p className="text-2xl font-black text-gray-900">{formatNumber(stats.totalQuestions || 0)}</p>
+                        <p className="text-xs text-gray-400 font-medium mt-1">{formatNumber(stats.activeSubscriptions || 0)} active subscriptions</p>
                     </div>
                 </div>
 

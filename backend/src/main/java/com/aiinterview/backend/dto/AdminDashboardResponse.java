@@ -28,6 +28,11 @@ public class AdminDashboardResponse {
         private double revenueGrowth;
         private long totalUsers;
         private double userGrowth;
+        private long totalInterviewSessions;
+        private long totalQuestions;
+        private long totalSubscriptions;
+        private long activeSubscriptions;
+        private BigDecimal averageInterviewScore;
         private BigDecimal avgRevenuePerOrder;
         private double avgRevenueGrowth;
     }

@@ -4,6 +4,7 @@ import com.aiinterview.backend.dto.AdminDashboardResponse;
 import com.aiinterview.backend.repository.PaymentRepository;
 import com.aiinterview.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -19,6 +20,7 @@ public class AdminDashboardService {
 
         private final UserRepository userRepository;
         private final PaymentRepository paymentRepository;
+        private final JdbcTemplate jdbcTemplate;
 
         public AdminDashboardResponse getDashboardStats() {
                 LocalDateTime now = LocalDateTime.now();
@@ -58,6 +60,13 @@ public class AdminDashboardService {
 
                 // Total stats
                 long totalUsersCount = userRepository.count();
+                long totalInterviewSessions = count("SELECT COUNT(*) FROM interview_sessions WHERE deleted_at IS NULL");
+                long totalQuestions = count("SELECT COUNT(*) FROM interview_questions");
+                long totalSubscriptions = count("SELECT COUNT(*) FROM user_subscriptions");
+                long activeSubscriptions = count("SELECT COUNT(*) FROM user_subscriptions WHERE status IN ('ACTIVE', 'ACTIVE_NON_RENEWING')");
+                BigDecimal averageInterviewScore = jdbcTemplate.queryForObject(
+                                "SELECT COALESCE(AVG(overall_score), 0) FROM interview_sessions WHERE deleted_at IS NULL AND overall_score IS NOT NULL",
+                                BigDecimal.class);
                 BigDecimal totalRevenueOverall = paymentRepository.sumRevenueSince(LocalDateTime.of(2000, 1, 1, 0, 0));
                 if (totalRevenueOverall == null)
                         totalRevenueOverall = BigDecimal.ZERO;
@@ -110,6 +119,11 @@ public class AdminDashboardService {
                                                 .revenueGrowth(revenueGrowth)
                                                 .totalUsers(totalUsersCount)
                                                 .userGrowth(userGrowth)
+                                                .totalInterviewSessions(totalInterviewSessions)
+                                                .totalQuestions(totalQuestions)
+                                                .totalSubscriptions(totalSubscriptions)
+                                                .activeSubscriptions(activeSubscriptions)
+                                                .averageInterviewScore(averageInterviewScore)
                                                 .avgRevenuePerOrder(currentAvgRevenue)
                                                 .avgRevenueGrowth(0.0)
                                                 .build())
@@ -118,6 +132,11 @@ public class AdminDashboardService {
                                 .topProducts(topProducts)
                                 .recentCustomers(recentCustomers)
                                 .build();
+        }
+
+        private long count(String sql) {
+                Long value = jdbcTemplate.queryForObject(sql, Long.class);
+                return value != null ? value : 0;
         }
 
         private double calculateGrowth(BigDecimal current, BigDecimal previous) {
