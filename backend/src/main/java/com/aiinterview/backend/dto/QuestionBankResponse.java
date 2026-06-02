@@ -32,6 +32,7 @@ public class QuestionBankResponse {
     private List<String> tags;
     private Boolean isActive;
     private Boolean bookmarked;
+    private Boolean practiced;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

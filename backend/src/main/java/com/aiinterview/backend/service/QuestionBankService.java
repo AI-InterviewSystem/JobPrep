@@ -13,6 +13,7 @@ import com.aiinterview.backend.dto.QuestionTopicResponse;
 import com.aiinterview.backend.exception.AppException;
 import com.aiinterview.backend.repository.JobCategoryRepository;
 import com.aiinterview.backend.repository.JobRoleRepository;
+import com.aiinterview.backend.repository.PracticeAnswerRepository;
 import com.aiinterview.backend.repository.QuestionBookmarkRepository;
 import com.aiinterview.backend.repository.QuestionBankRepository;
 import com.aiinterview.backend.repository.QuestionTopicRepository;
@@ -43,6 +44,7 @@ public class QuestionBankService {
     private final JobRoleRepository jobRoleRepository;
     private final QuestionTopicRepository questionTopicRepository;
     private final QuestionBookmarkRepository questionBookmarkRepository;
+    private final PracticeAnswerRepository practiceAnswerRepository;
     private final UserRepository userRepository;
 
     @Transactional(readOnly = true)
@@ -58,7 +60,7 @@ public class QuestionBankService {
             query.orderBy(cb.desc(root.get("updatedAt")), cb.desc(root.get("id")));
             return cb.and(predicates.toArray(Predicate[]::new));
         };
-        return questionBankRepository.findAll(spec).stream().map(question -> mapQuestion(question, false)).toList();
+        return questionBankRepository.findAll(spec).stream().map(question -> mapQuestion(question, false, false)).toList();
     }
 
     @Transactional(readOnly = true)
@@ -93,9 +95,10 @@ public class QuestionBankService {
 
         List<QuestionBank> questions = questionBankRepository.findAll(spec);
         Set<Integer> bookmarkedIds = getBookmarkedIds(user, questions.stream().map(QuestionBank::getId).toList());
+        Set<Integer> practicedIds = getPracticedIds(user, questions.stream().map(QuestionBank::getId).toList());
         return questions.stream()
                 .filter(question -> !Boolean.TRUE.equals(bookmarkedOnly) || bookmarkedIds.contains(question.getId()))
-                .map(question -> mapQuestion(question, bookmarkedIds.contains(question.getId())))
+                .map(question -> mapQuestion(question, bookmarkedIds.contains(question.getId()), practicedIds.contains(question.getId())))
                 .toList();
     }
 
@@ -106,7 +109,8 @@ public class QuestionBankService {
                 .filter(q -> q.getDeletedAt() == null && Boolean.TRUE.equals(q.getIsActive()))
                 .orElseThrow(() -> new AppException("Question not found"));
         boolean bookmarked = questionBookmarkRepository.existsByUserIdAndQuestionId(user.getId(), id);
-        return mapQuestion(question, bookmarked);
+        boolean practiced = practiceAnswerRepository.existsByPracticeSessionUserIdAndQuestionId(user.getId(), id);
+        return mapQuestion(question, bookmarked, practiced);
     }
 
     @Transactional(readOnly = true)
@@ -115,7 +119,8 @@ public class QuestionBankService {
         return questionBookmarkRepository.findAllByUserIdOrderByCreatedAtDesc(user.getId()).stream()
                 .map(QuestionBookmark::getQuestion)
                 .filter(question -> question.getDeletedAt() == null && Boolean.TRUE.equals(question.getIsActive()))
-                .map(question -> mapQuestion(question, true))
+                .map(question -> mapQuestion(question, true,
+                        practiceAnswerRepository.existsByPracticeSessionUserIdAndQuestionId(user.getId(), question.getId())))
                 .toList();
     }
 
@@ -128,7 +133,8 @@ public class QuestionBankService {
         if (!questionBookmarkRepository.existsByUserIdAndQuestionId(user.getId(), questionId)) {
             questionBookmarkRepository.save(QuestionBookmark.builder().user(user).question(question).build());
         }
-        return mapQuestion(question, true);
+        boolean practiced = practiceAnswerRepository.existsByPracticeSessionUserIdAndQuestionId(user.getId(), questionId);
+        return mapQuestion(question, true, practiced);
     }
 
     @Transactional
@@ -152,7 +158,7 @@ public class QuestionBankService {
     public QuestionBankResponse createQuestion(QuestionBankRequest request) {
         QuestionBank question = QuestionBank.builder().build();
         applyRequest(question, request);
-        return mapQuestion(questionBankRepository.save(question), false);
+        return mapQuestion(questionBankRepository.save(question), false, false);
     }
 
     @Transactional
@@ -161,7 +167,7 @@ public class QuestionBankService {
                 .filter(q -> q.getDeletedAt() == null)
                 .orElseThrow(() -> new AppException("Question not found"));
         applyRequest(question, request);
-        return mapQuestion(questionBankRepository.save(question), false);
+        return mapQuestion(questionBankRepository.save(question), false, false);
     }
 
     @Transactional
@@ -179,7 +185,7 @@ public class QuestionBankService {
                 .filter(q -> q.getDeletedAt() == null)
                 .orElseThrow(() -> new AppException("Question not found"));
         question.setIsActive(active);
-        return mapQuestion(questionBankRepository.save(question), false);
+        return mapQuestion(questionBankRepository.save(question), false, false);
     }
 
     @Transactional
@@ -256,7 +262,14 @@ public class QuestionBankService {
                 .collect(Collectors.toSet());
     }
 
-    private QuestionBankResponse mapQuestion(QuestionBank question, boolean bookmarked) {
+    private Set<Integer> getPracticedIds(User user, List<Integer> questionIds) {
+        if (questionIds == null || questionIds.isEmpty()) return Set.of();
+        return practiceAnswerRepository.findAllByPracticeSessionUserIdAndQuestionIdIn(user.getId(), questionIds).stream()
+                .map(answer -> answer.getQuestion().getId())
+                .collect(Collectors.toSet());
+    }
+
+    private QuestionBankResponse mapQuestion(QuestionBank question, boolean bookmarked, boolean practiced) {
         JobCategory category = question.getJobCategory();
         JobGroup group = category != null ? category.getJobGroup() : null;
         JobRole jobRole = question.getJobRole();
@@ -284,6 +297,7 @@ public class QuestionBankService {
                 .tags(question.getTags() != null ? Arrays.asList(question.getTags()) : List.of())
                 .isActive(question.getIsActive())
                 .bookmarked(bookmarked)
+                .practiced(practiced)
                 .createdAt(question.getCreatedAt())
                 .updatedAt(question.getUpdatedAt())
                 .build();

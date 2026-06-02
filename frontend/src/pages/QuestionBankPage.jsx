@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FiBookmark, FiBookOpen, FiChevronRight, FiRefreshCw, FiSearch, FiTag, FiX } from 'react-icons/fi';
+import { FiBookmark, FiBookOpen, FiChevronRight, FiMic, FiPlay, FiRefreshCw, FiSend, FiSearch, FiTag, FiX } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { experienceLevelsApi, questionBankApi } from '../services/api';
 
@@ -20,6 +20,11 @@ export default function QuestionBankPage() {
     const [loading, setLoading] = useState(true);
     const [detailLoading, setDetailLoading] = useState(false);
     const [showBookmarks, setShowBookmarks] = useState(false);
+    const [practiceSession, setPracticeSession] = useState(null);
+    const [practiceAnswer, setPracticeAnswer] = useState('');
+    const [practiceFeedback, setPracticeFeedback] = useState(null);
+    const [practiceLoading, setPracticeLoading] = useState(false);
+    const [listening, setListening] = useState(false);
     const [filters, setFilters] = useState({
         role: '',
         level: '',
@@ -98,6 +103,8 @@ export default function QuestionBankPage() {
             setDetailLoading(true);
             const response = await questionBankApi.get(question.id);
             setSelectedQuestion(response.data);
+            setPracticeAnswer('');
+            setPracticeFeedback(null);
         } catch (error) {
             toast.error('Failed to load question detail');
             console.error(error);
@@ -134,10 +141,97 @@ export default function QuestionBankPage() {
         setShowBookmarks(false);
     };
 
+    const startPractice = async (question = null) => {
+        try {
+            setPracticeLoading(true);
+            const response = await questionBankApi.startPractice({
+                questionId: question?.id || undefined,
+                topicId: !question ? (filters.topicId || undefined) : (question.topicId || undefined),
+                role: filters.role || question?.role || undefined,
+                level: filters.level || question?.level || undefined,
+                totalQuestions: question ? 1 : 5,
+            });
+            setPracticeSession(response.data);
+            if (question) {
+                setSelectedQuestion(question);
+            } else if (response.data.questions?.length) {
+                setSelectedQuestion(response.data.questions[0]);
+            }
+            setPracticeAnswer('');
+            setPracticeFeedback(null);
+            toast.success('Practice session started');
+        } catch (error) {
+            toast.error(error?.response?.data?.message || 'Failed to start practice');
+            console.error(error);
+        } finally {
+            setPracticeLoading(false);
+        }
+    };
+
+    const startSpeechToText = () => {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            toast.error('Speech recognition is not supported in this browser.');
+            return;
+        }
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'en-US';
+        recognition.interimResults = true;
+        recognition.continuous = false;
+        setListening(true);
+        recognition.onresult = (event) => {
+            const transcript = Array.from(event.results)
+                .map(result => result[0]?.transcript || '')
+                .join(' ');
+            setPracticeAnswer(transcript);
+        };
+        recognition.onerror = () => {
+            setListening(false);
+            toast.error('Microphone transcription failed');
+        };
+        recognition.onend = () => setListening(false);
+        recognition.start();
+    };
+
+    const submitPracticeAnswer = async () => {
+        if (!selectedQuestion) {
+            toast.error('Select a question first');
+            return;
+        }
+        try {
+            setPracticeLoading(true);
+            let session = practiceSession;
+            if (!session) {
+                const response = await questionBankApi.startPractice({
+                    questionId: selectedQuestion.id,
+                    topicId: selectedQuestion.topicId || undefined,
+                    totalQuestions: 1,
+                });
+                session = response.data;
+                setPracticeSession(session);
+            }
+            const response = await questionBankApi.submitPracticeAnswer(session.id, {
+                questionId: selectedQuestion.id,
+                answerText: practiceAnswer,
+                inputType: 'AUDIO',
+            });
+            setPracticeFeedback(response.data);
+            setQuestions(prev => prev.map(question => question.id === selectedQuestion.id ? { ...question, practiced: true } : question));
+            setSelectedQuestion(prev => prev ? { ...prev, practiced: true } : prev);
+            toast.success('Answer submitted');
+        } catch (error) {
+            toast.error(error?.response?.data?.message || 'Failed to submit answer');
+            console.error(error);
+        } finally {
+            setPracticeLoading(false);
+        }
+    };
+
     const renderMeta = (question) => (
         <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
             <span className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-700">{question.questionType || 'General'}</span>
             <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700">{question.level || 'Any level'}</span>
+            {question.practiced && <span className="rounded-full bg-green-50 px-2.5 py-1 font-semibold text-green-700">Practiced</span>}
             {(question.role || question.jobRoleName) && <span>{question.role || question.jobRoleName}</span>}
             {question.topicName && <span>{question.topicName}</span>}
         </div>
@@ -151,6 +245,13 @@ export default function QuestionBankPage() {
                     <p className="text-sm text-gray-500">Browse practice questions by role, level, topic, and type.</p>
                 </div>
                 <div className="flex gap-2">
+                    <button
+                        onClick={() => startPractice()}
+                        disabled={practiceLoading || !filters.topicId}
+                        className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-slate-50 disabled:opacity-50"
+                    >
+                        <FiPlay /> Start Topic Practice
+                    </button>
                     <button
                         onClick={() => setShowBookmarks(false)}
                         className={`rounded-xl px-4 py-2 text-sm font-semibold ${!showBookmarks ? 'bg-primary text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
@@ -271,6 +372,61 @@ export default function QuestionBankPage() {
                                 <FiBookmark className={selectedQuestion.bookmarked ? 'fill-current' : ''} />
                                 {selectedQuestion.bookmarked ? 'Bookmarked' : 'Bookmark Question'}
                             </button>
+
+                            <section className="rounded-2xl border border-blue-100 bg-blue-50/50 p-4">
+                                <div className="mb-3 flex items-center justify-between gap-3">
+                                    <div>
+                                        <h3 className="font-bold text-gray-900">Practice Mode</h3>
+                                        <p className="text-xs text-gray-500">Speak your answer, review the transcript, then submit for quick AI feedback.</p>
+                                    </div>
+                                    <button
+                                        onClick={() => startPractice(selectedQuestion)}
+                                        disabled={practiceLoading}
+                                        className="flex shrink-0 items-center gap-2 rounded-xl bg-primary px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                                    >
+                                        <FiPlay /> Start
+                                    </button>
+                                </div>
+                                <textarea
+                                    value={practiceAnswer}
+                                    onChange={(e) => setPracticeAnswer(e.target.value)}
+                                    rows="4"
+                                    placeholder="Click mic and answer verbally, or type your answer here."
+                                    className="w-full resize-none rounded-xl border border-blue-100 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                                />
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                    <button
+                                        onClick={startSpeechToText}
+                                        disabled={listening || practiceLoading}
+                                        className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold ${listening ? 'bg-red-100 text-red-700' : 'bg-white text-gray-700 border border-blue-100'}`}
+                                    >
+                                        <FiMic /> {listening ? 'Listening...' : 'Speak'}
+                                    </button>
+                                    <button
+                                        onClick={submitPracticeAnswer}
+                                        disabled={practiceLoading || !practiceAnswer.trim()}
+                                        className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                                    >
+                                        <FiSend /> Submit Answer
+                                    </button>
+                                </div>
+                                {practiceFeedback && (
+                                    <div className="mt-4 rounded-xl bg-white p-4 text-sm">
+                                        <div className="mb-2 flex items-center justify-between">
+                                            <p className="font-bold text-gray-900">Practice Feedback</p>
+                                            <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
+                                                {practiceFeedback.score != null ? `${practiceFeedback.score}/100` : 'Saved'}
+                                            </span>
+                                        </div>
+                                        <p className="whitespace-pre-line leading-6 text-gray-600">{practiceFeedback.feedbackSummary}</p>
+                                        {practiceFeedback.suggestedImprovements?.length > 0 && (
+                                            <ul className="mt-3 list-disc space-y-1 pl-5 text-gray-600">
+                                                {practiceFeedback.suggestedImprovements.map((item, index) => <li key={index}>{item}</li>)}
+                                            </ul>
+                                        )}
+                                    </div>
+                                )}
+                            </section>
 
                             <div className="grid grid-cols-2 gap-3 text-sm">
                                 <div className="rounded-xl bg-slate-50 p-3">
