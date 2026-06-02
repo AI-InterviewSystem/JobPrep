@@ -32,6 +32,10 @@ public class QuestionBank {
     @JoinColumn(name = "role_id")
     private JobRole jobRole;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "topic_id")
+    private QuestionTopic topic;
+
     @Column(name = "question_text", nullable = false, columnDefinition = "text")
     private String questionText;
 
@@ -40,6 +44,22 @@ public class QuestionBank {
 
     @Column(name = "question_type", length = 30)
     private String questionType;
+
+    @Column(length = 100)
+    private String role;
+
+    @Column(length = 50)
+    private String level;
+
+    @Column(name = "sample_answer", columnDefinition = "text")
+    private String sampleAnswer;
+
+    @Column(columnDefinition = "text")
+    private String explanation;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by")
+    private User createdBy;
 
     @Column(name = "suggested_duration")
     @Builder.Default

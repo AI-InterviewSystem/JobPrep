@@ -32,6 +32,7 @@ export default function Navbar() {
                 <nav className="hidden md:flex flex-1 justify-center items-center gap-10 text-m font-semibold text-gray-600">
                     <Link to="/dashboard" className={`${isActive('/dashboard') ? 'text-primary' : 'hover:text-primary transition-colors'}`}>Dashboard</Link>
                     <Link to="/interview-setup" className={`${isActive('/interview-setup') ? 'text-primary' : 'hover:text-primary transition-colors'}`}>Practice</Link>
+                    <Link to="/question-bank" className={`${location.pathname.startsWith('/question-bank') ? 'text-primary' : 'hover:text-primary transition-colors'}`}>Question Bank</Link>
                     <Link to="/pricing" className={`${isActive('/pricing') ? 'text-primary' : 'hover:text-primary transition-colors'}`}>Pricing</Link>
                     <Link to="/feedback" className={`${isActive('/feedback') ? 'text-primary' : 'hover:text-primary transition-colors'}`}>Feedback</Link>
                     {isAdmin && (
