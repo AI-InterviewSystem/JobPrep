@@ -97,6 +97,9 @@ export const questionBankApi = {
     getBookmarks: () => api.get('/question-bank/bookmarks'),
     bookmark: (id) => api.post(`/question-bank/${id}/bookmark`),
     removeBookmark: (id) => api.delete(`/question-bank/${id}/bookmark`),
+    startPractice: (data) => api.post('/question-bank/practice/sessions', data),
+    submitPracticeAnswer: (sessionId, data) => api.post(`/question-bank/practice/sessions/${sessionId}/answers`, data),
+    getPracticeAnswers: (sessionId) => api.get(`/question-bank/practice/sessions/${sessionId}/answers`),
 };
 
 

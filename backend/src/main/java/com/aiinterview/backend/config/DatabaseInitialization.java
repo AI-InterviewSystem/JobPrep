@@ -155,6 +155,52 @@ public class DatabaseInitialization {
                     )
                     """);
             jdbcTemplate.execute("UPDATE question_bank SET deleted_at = NULL WHERE deleted_at IS NOT NULL");
+            jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS practice_sessions (
+                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                        topic_id INTEGER REFERENCES question_topics(id),
+                        category_id UUID REFERENCES job_categories(id),
+                        role VARCHAR(100),
+                        level VARCHAR(50),
+                        status VARCHAR(30) DEFAULT 'in_progress',
+                        total_questions INTEGER DEFAULT 0,
+                        completed_questions INTEGER DEFAULT 0,
+                        overall_score DECIMAL(5,2),
+                        started_at TIMESTAMPTZ DEFAULT now(),
+                        completed_at TIMESTAMPTZ,
+                        created_at TIMESTAMPTZ DEFAULT now()
+                    )
+                    """);
+            jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS practice_answers (
+                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                        practice_session_id UUID NOT NULL REFERENCES practice_sessions(id) ON DELETE CASCADE,
+                        question_id INTEGER NOT NULL REFERENCES question_bank(id),
+                        answer_text TEXT,
+                        audio_storage_path TEXT,
+                        input_type VARCHAR(20),
+                        score DECIMAL(5,2),
+                        feedback_summary TEXT,
+                        suggested_improvements JSONB,
+                        answered_at TIMESTAMPTZ DEFAULT now()
+                    )
+                    """);
+            jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS user_topic_metrics (
+                        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                        topic_id INTEGER NOT NULL REFERENCES question_topics(id),
+                        total_practiced INTEGER DEFAULT 0,
+                        correct_count INTEGER DEFAULT 0,
+                        avg_score DECIMAL(5,2),
+                        best_score DECIMAL(5,2),
+                        weakest_score DECIMAL(5,2),
+                        last_practiced_at TIMESTAMPTZ,
+                        created_at TIMESTAMPTZ DEFAULT now(),
+                        updated_at TIMESTAMPTZ DEFAULT now(),
+                        PRIMARY KEY(user_id, topic_id)
+                    )
+                    """);
             log.info("Ensured question_bank table exists");
         } catch (Exception e) {
             log.warn("Could not create question_bank table: {}", e.getMessage());
