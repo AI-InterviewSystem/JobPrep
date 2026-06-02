@@ -17,6 +17,7 @@ import InterviewSetupPage from "../pages/InterviewSetupPage"
 import LiveInterviewPage from "../pages/LiveInterviewPage"
 import InterviewResultPage from "../pages/InterviewResultPage"
 import InterviewHistoryPage from "../pages/InterviewHistoryPage"
+import QuestionBankPage from "../pages/QuestionBankPage"
 import OtpPage from "../pages/OtpPage"
 import AdminDashboard from "../pages/AdminDashboard"
 import AdminUsersPage from "../pages/AdminUsersPage"
@@ -116,6 +117,12 @@ export default function AppRoutes() {
                     <Route path="/interview-setup" element={
                         <ProtectedRoute>
                             <InterviewSetupPage />
+                        </ProtectedRoute>
+                    } />
+
+                    <Route path="/question-bank" element={
+                        <ProtectedRoute>
+                            <QuestionBankPage />
                         </ProtectedRoute>
                     } />
 

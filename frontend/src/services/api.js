@@ -90,6 +90,15 @@ export const experienceLevelsApi = {
     getActive: () => api.get('/experience-levels'),
 };
 
+export const questionBankApi = {
+    list: (params) => api.get('/question-bank', { params }),
+    get: (id) => api.get(`/question-bank/${id}`),
+    getTopics: () => api.get('/question-bank/topics'),
+    getBookmarks: () => api.get('/question-bank/bookmarks'),
+    bookmark: (id) => api.post(`/question-bank/${id}/bookmark`),
+    removeBookmark: (id) => api.delete(`/question-bank/${id}/bookmark`),
+};
+
 
 
 export const adminPricingPlansApi = {

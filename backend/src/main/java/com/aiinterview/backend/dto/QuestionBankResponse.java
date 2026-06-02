@@ -19,12 +19,19 @@ public class QuestionBankResponse {
     private String jobCategoryName;
     private UUID jobRoleId;
     private String jobRoleName;
+    private Integer topicId;
+    private String topicName;
     private String questionText;
     private String difficulty;
+    private String role;
+    private String level;
     private String questionType;
+    private String sampleAnswer;
+    private String explanation;
     private Integer suggestedDuration;
     private List<String> tags;
     private Boolean isActive;
+    private Boolean bookmarked;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

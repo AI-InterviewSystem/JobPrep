@@ -104,13 +104,29 @@ public class DatabaseInitialization {
 
         try {
             jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS question_topics (
+                        id SERIAL PRIMARY KEY,
+                        name VARCHAR(100) UNIQUE NOT NULL,
+                        description TEXT,
+                        is_active BOOLEAN DEFAULT true,
+                        created_at TIMESTAMPTZ DEFAULT now(),
+                        updated_at TIMESTAMPTZ DEFAULT now()
+                    )
+                    """);
+            jdbcTemplate.execute("""
                     CREATE TABLE IF NOT EXISTS question_bank (
                         id SERIAL PRIMARY KEY,
                         category_id UUID REFERENCES job_categories(id),
                         role_id UUID REFERENCES job_roles(id),
+                        topic_id INTEGER REFERENCES question_topics(id),
                         question_text TEXT NOT NULL,
                         difficulty VARCHAR(20),
+                        role VARCHAR(100),
+                        level VARCHAR(50),
                         question_type VARCHAR(30),
+                        sample_answer TEXT,
+                        explanation TEXT,
+                        created_by UUID REFERENCES users(id),
                         suggested_duration INTEGER DEFAULT 120,
                         tags TEXT[],
                         is_active BOOLEAN DEFAULT true,
@@ -121,8 +137,23 @@ public class DatabaseInitialization {
                     """);
             jdbcTemplate.execute("ALTER TABLE question_bank ADD COLUMN IF NOT EXISTS category_id UUID REFERENCES job_categories(id)");
             jdbcTemplate.execute("ALTER TABLE question_bank ADD COLUMN IF NOT EXISTS role_id UUID REFERENCES job_roles(id)");
+            jdbcTemplate.execute("ALTER TABLE question_bank ADD COLUMN IF NOT EXISTS topic_id INTEGER REFERENCES question_topics(id)");
+            jdbcTemplate.execute("ALTER TABLE question_bank ADD COLUMN IF NOT EXISTS role VARCHAR(100)");
+            jdbcTemplate.execute("ALTER TABLE question_bank ADD COLUMN IF NOT EXISTS level VARCHAR(50)");
             jdbcTemplate.execute("ALTER TABLE question_bank ADD COLUMN IF NOT EXISTS question_type VARCHAR(30)");
+            jdbcTemplate.execute("ALTER TABLE question_bank ADD COLUMN IF NOT EXISTS sample_answer TEXT");
+            jdbcTemplate.execute("ALTER TABLE question_bank ADD COLUMN IF NOT EXISTS explanation TEXT");
+            jdbcTemplate.execute("ALTER TABLE question_bank ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id)");
             jdbcTemplate.execute("ALTER TABLE question_bank ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ");
+            jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS question_bookmarks (
+                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                        question_id INTEGER NOT NULL REFERENCES question_bank(id) ON DELETE CASCADE,
+                        created_at TIMESTAMPTZ DEFAULT now(),
+                        UNIQUE(user_id, question_id)
+                    )
+                    """);
             jdbcTemplate.execute("UPDATE question_bank SET deleted_at = NULL WHERE deleted_at IS NOT NULL");
             log.info("Ensured question_bank table exists");
         } catch (Exception e) {
