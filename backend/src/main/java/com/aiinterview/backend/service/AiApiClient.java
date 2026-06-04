@@ -65,6 +65,14 @@ public class AiApiClient {
         return postJson("/interview/answer", requestBody, "submit answer", 4);
     }
 
+    public String submitQuestionBankPracticeAnswer(String sessionId, Map<String, Object> requestBody) {
+        return postJson(
+                "/ai-interview/question-bank/practice/sessions/" + sessionId + "/answers",
+                requestBody,
+                "score question bank practice answer",
+                4);
+    }
+
     public String getSummary(Map<String, Object> requestBody) {
         return postJson("/interview/summary", requestBody, "get interview summary", 3);
     }
