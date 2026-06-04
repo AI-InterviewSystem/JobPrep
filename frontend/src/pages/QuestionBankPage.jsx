@@ -223,6 +223,7 @@ export default function QuestionBankPage() {
                 questionId: selectedQuestion.id,
                 answerText: practiceAnswer,
                 inputType: 'AUDIO',
+                practiceMode: true,
             });
             setPracticeFeedback(response.data);
             setQuestions(prev => prev.map(question => question.id === selectedQuestion.id ? { ...question, practiced: true } : question));
