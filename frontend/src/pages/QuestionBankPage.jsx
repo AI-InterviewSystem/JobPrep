@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { FiBookmark, FiBookOpen, FiChevronRight, FiMic, FiPlay, FiRefreshCw, FiSend, FiSearch, FiTag, FiX } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { experienceLevelsApi, questionBankApi } from '../services/api';
@@ -13,6 +14,7 @@ const typeOptions = [
 ];
 
 export default function QuestionBankPage() {
+    const [searchParams] = useSearchParams();
     const [questions, setQuestions] = useState([]);
     const [topics, setTopics] = useState([]);
     const [levels, setLevels] = useState([]);
@@ -36,6 +38,13 @@ export default function QuestionBankPage() {
     useEffect(() => {
         fetchBootstrap();
     }, []);
+
+    useEffect(() => {
+        const topicId = searchParams.get('topicId');
+        if (topicId) {
+            setFilters(prev => ({ ...prev, topicId }));
+        }
+    }, [searchParams]);
 
     useEffect(() => {
         fetchQuestions();

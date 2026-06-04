@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom"
 import logo from "../../assets/images/jobprep-logo.png"
 import AvatarMenu from "./AvatarMenu"
+import NotificationBell from "./NotificationBell"
 import { storage } from "../../services/storage"
 
 export default function Navbar() {
@@ -44,7 +45,8 @@ export default function Navbar() {
                 </nav>
 
                 {/* Right actions - Fixed width on the right */}
-                <div className="w-48 flex-shrink-0 flex items-center justify-end gap-6">
+                <div className="w-48 flex-shrink-0 flex items-center justify-end gap-4">
+                    {hasToken && !isAdmin && <NotificationBell />}
                     {!hasToken ? (
                         <>
                             <Link

@@ -13,6 +13,7 @@ import ResetPasswordPage from "../pages/ResetPasswordPage"
 import GoogleCallback from "../pages/GoogleCallback"
 import PricingPage from "../pages/PricingPage"
 import DashboardPage from "../pages/DashboardPage"
+import NotificationsPage from "../pages/NotificationsPage"
 import InterviewSetupPage from "../pages/InterviewSetupPage"
 import LiveInterviewPage from "../pages/LiveInterviewPage"
 import InterviewResultPage from "../pages/InterviewResultPage"
@@ -80,6 +81,12 @@ export default function AppRoutes() {
                     <Route path="/dashboard" element={
                         <ProtectedRoute>
                             <DashboardPage />
+                        </ProtectedRoute>
+                    } />
+
+                    <Route path="/notifications" element={
+                        <ProtectedRoute>
+                            <NotificationsPage />
                         </ProtectedRoute>
                     } />
 
