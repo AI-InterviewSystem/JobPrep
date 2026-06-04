@@ -90,6 +90,21 @@ export const experienceLevelsApi = {
     getActive: () => api.get('/experience-levels'),
 };
 
+export const dashboardApi = {
+    get: () => api.get('/dashboard'),
+};
+
+export const notificationApi = {
+    list: () => api.get('/notifications'),
+    getUnreadCount: () => api.get('/notifications/unread-count'),
+    get: (id) => api.get(`/notifications/${id}`),
+    markRead: (id) => api.patch(`/notifications/${id}/read`),
+    markAllRead: () => api.patch('/notifications/read-all'),
+    delete: (id) => api.delete(`/notifications/${id}`),
+    getPreferences: () => api.get('/notifications/preferences'),
+    updatePreferences: (data) => api.put('/notifications/preferences', data),
+};
+
 export const questionBankApi = {
     list: (params) => api.get('/question-bank', { params }),
     get: (id) => api.get(`/question-bank/${id}`),

@@ -15,6 +15,12 @@ import java.util.UUID;
 public interface InterviewSessionRepository extends JpaRepository<InterviewSession, UUID> {
     List<InterviewSession> findByUserIdOrderByCreatedAtDesc(UUID userId);
 
+    long countByUserIdAndDeletedAtIsNull(UUID userId);
+
+    long countByUserIdAndStatusAndDeletedAtIsNull(UUID userId, InterviewSession.InterviewStatus status);
+
+    long countByUserIdAndRetryOfSessionIdIsNotNullAndDeletedAtIsNull(UUID userId);
+
     @Query(value = """
             SELECT DISTINCT s.*
             FROM interview_sessions s

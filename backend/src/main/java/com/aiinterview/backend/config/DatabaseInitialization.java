@@ -232,5 +232,38 @@ public class DatabaseInitialization {
         } catch (Exception e) {
             log.warn("Could not create interview_recordings table: {}", e.getMessage());
         }
+
+        try {
+            jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS notifications (
+                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                        type VARCHAR(50) NOT NULL,
+                        title VARCHAR(255) NOT NULL,
+                        content TEXT NOT NULL,
+                        action_url TEXT,
+                        action_label VARCHAR(100),
+                        is_read BOOLEAN DEFAULT false,
+                        metadata JSONB,
+                        created_at TIMESTAMPTZ DEFAULT now(),
+                        deleted_at TIMESTAMPTZ
+                    )
+                    """);
+            jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS user_learning_stats (
+                        user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                        current_streak INTEGER DEFAULT 0,
+                        longest_streak INTEGER DEFAULT 0,
+                        last_activity_date DATE,
+                        practice_reminders BOOLEAN DEFAULT true,
+                        subscription_alerts BOOLEAN DEFAULT true,
+                        learning_suggestions BOOLEAN DEFAULT true,
+                        updated_at TIMESTAMPTZ DEFAULT now()
+                    )
+                    """);
+            log.info("Ensured notifications and user_learning_stats tables exist");
+        } catch (Exception e) {
+            log.warn("Could not create notification tables: {}", e.getMessage());
+        }
     }
 }

@@ -35,6 +35,7 @@ public class InterviewSessionService {
     private final CvUploadService cvUploadService;
     private final InterviewRecordingService interviewRecordingService;
     private final ObjectMapper objectMapper;
+    private final UserLearningStatsService userLearningStatsService;
 
     @Transactional
     public InterviewSessionResponse createSession(String userEmail, CreateInterviewSessionRequest request) {
@@ -307,6 +308,7 @@ public class InterviewSessionService {
             session.setEndTime(LocalDateTime.now());
             updateSessionCompletionMetrics(session, questionRepository.findBySessionIdOrderByOrderIndexAsc(sessionId));
             InterviewSession saved = sessionRepository.save(session);
+            userLearningStatsService.recordActivity(saved.getUser());
 
             List<InterviewQuestion> questions = questionRepository.findBySessionIdOrderByOrderIndexAsc(sessionId);
             return buildResponse(saved, questions);
@@ -458,6 +460,7 @@ public class InterviewSessionService {
         updateSessionCompletionMetrics(session, questions);
 
         InterviewSession saved = sessionRepository.save(session);
+        userLearningStatsService.recordActivity(saved.getUser());
         return buildResponse(saved, questions);
     }
 

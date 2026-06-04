@@ -39,7 +39,8 @@ public class PracticeService {
     public PracticeSessionResponse startSession(StartPracticeSessionRequest request) {
         User user = getCurrentUser();
         QuestionTopic topic = request.getTopicId() != null
-                ? questionTopicRepository.findById(request.getTopicId()).orElseThrow(() -> new AppException("Topic not found"))
+                ? questionTopicRepository.findById(request.getTopicId())
+                        .orElseThrow(() -> new AppException("Topic not found"))
                 : null;
 
         List<QuestionBankResponse> selectedQuestions;
@@ -49,13 +50,14 @@ public class PracticeService {
                 topic = questionTopicRepository.findById(selectedQuestions.get(0).getTopicId()).orElse(null);
             }
         } else {
-            int limit = request.getTotalQuestions() != null ? Math.max(1, Math.min(request.getTotalQuestions(), 10)) : 5;
+            int limit = request.getTotalQuestions() != null ? Math.max(1, Math.min(request.getTotalQuestions(), 10))
+                    : 5;
             selectedQuestions = questionBankService.getUserQuestions(
-                            request.getRole(),
-                            request.getLevel(),
-                            request.getTopicId(),
-                            null,
-                            false)
+                    request.getRole(),
+                    request.getLevel(),
+                    request.getTopicId(),
+                    null,
+                    false)
                     .stream()
                     .limit(limit)
                     .toList();
@@ -133,7 +135,8 @@ public class PracticeService {
             BigDecimal score = decimalFrom(evaluation, "score", "overall_score");
             answer.setScore(score);
             answer.setFeedbackSummary(textFrom(evaluation, "feedback", "feedback_summary", "summary"));
-            List<String> improvements = listFrom(evaluation, "suggested_improvements", "improvement_suggestions", "weaknesses");
+            List<String> improvements = listFrom(evaluation, "suggested_improvements", "improvement_suggestions",
+                    "weaknesses");
             if (improvements.isEmpty() && evaluation.has("improved_answer")) {
                 improvements = List.of(evaluation.get("improved_answer").asText());
             }
@@ -141,7 +144,8 @@ public class PracticeService {
         } catch (Exception e) {
             log.warn("Practice AI feedback unavailable for question {}: {}", question.getId(), e.getMessage());
             answer.setScore(null);
-            answer.setFeedbackSummary("AI feedback is temporarily unavailable. Your answer was saved for practice history.");
+            answer.setFeedbackSummary(
+                    "AI feedback is temporarily unavailable. Your answer was saved for practice history.");
             answer.setSuggestedImprovements(List.of("Try again later to receive AI evaluation."));
         }
     }
@@ -163,18 +167,19 @@ public class PracticeService {
 
         if (question.getTopic() != null) {
             BigDecimal score = currentAnswer.getScore() != null ? currentAnswer.getScore() : BigDecimal.ZERO;
-            jdbcTemplate.update("""
-                    INSERT INTO user_topic_metrics (user_id, topic_id, total_practiced, correct_count, avg_score, best_score, weakest_score, last_practiced_at, created_at, updated_at)
-                    VALUES (?, ?, 1, ?, ?, ?, ?, now(), now(), now())
-                    ON CONFLICT (user_id, topic_id) DO UPDATE SET
-                        total_practiced = user_topic_metrics.total_practiced + 1,
-                        correct_count = user_topic_metrics.correct_count + EXCLUDED.correct_count,
-                        avg_score = COALESCE((user_topic_metrics.avg_score * user_topic_metrics.total_practiced + EXCLUDED.avg_score) / NULLIF(user_topic_metrics.total_practiced + 1, 0), EXCLUDED.avg_score),
-                        best_score = GREATEST(COALESCE(user_topic_metrics.best_score, EXCLUDED.best_score), EXCLUDED.best_score),
-                        weakest_score = LEAST(COALESCE(user_topic_metrics.weakest_score, EXCLUDED.weakest_score), EXCLUDED.weakest_score),
-                        last_practiced_at = now(),
-                        updated_at = now()
-                    """,
+            jdbcTemplate.update(
+                    """
+                            INSERT INTO user_topic_metrics (user_id, topic_id, total_practiced, correct_count, avg_score, best_score, weakest_score, last_practiced_at, created_at, updated_at)
+                            VALUES (?, ?, 1, ?, ?, ?, ?, now(), now(), now())
+                            ON CONFLICT (user_id, topic_id) DO UPDATE SET
+                                total_practiced = user_topic_metrics.total_practiced + 1,
+                                correct_count = user_topic_metrics.correct_count + EXCLUDED.correct_count,
+                                avg_score = COALESCE((user_topic_metrics.avg_score * user_topic_metrics.total_practiced + EXCLUDED.avg_score) / NULLIF(user_topic_metrics.total_practiced + 1, 0), EXCLUDED.avg_score),
+                                best_score = GREATEST(COALESCE(user_topic_metrics.best_score, EXCLUDED.best_score), EXCLUDED.best_score),
+                                weakest_score = LEAST(COALESCE(user_topic_metrics.weakest_score, EXCLUDED.weakest_score), EXCLUDED.weakest_score),
+                                last_practiced_at = now(),
+                                updated_at = now()
+                            """,
                     session.getUser().getId(),
                     question.getTopic().getId(),
                     score.compareTo(BigDecimal.valueOf(70)) >= 0 ? 1 : 0,
@@ -218,7 +223,8 @@ public class PracticeService {
 
     private User getCurrentUser() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated()) throw new AppException("Authentication required");
+        if (auth == null || !auth.isAuthenticated())
+            throw new AppException("Authentication required");
         return userRepository.findByEmail(auth.getName()).orElseThrow(() -> new AppException("User not found"));
     }
 
@@ -227,7 +233,8 @@ public class PracticeService {
     }
 
     private BigDecimal decimalFrom(JsonNode node, String... fields) {
-        if (node == null) return null;
+        if (node == null)
+            return null;
         for (String field : fields) {
             if (node.has(field) && !node.get(field).isNull()) {
                 try {
@@ -241,7 +248,8 @@ public class PracticeService {
     }
 
     private String textFrom(JsonNode node, String... fields) {
-        if (node == null) return null;
+        if (node == null)
+            return null;
         for (String field : fields) {
             if (node.has(field) && !node.get(field).isNull()) {
                 return node.get(field).asText();
@@ -251,7 +259,8 @@ public class PracticeService {
     }
 
     private List<String> listFrom(JsonNode node, String... fields) {
-        if (node == null) return List.of();
+        if (node == null)
+            return List.of();
         for (String field : fields) {
             if (node.has(field) && node.get(field).isArray()) {
                 List<String> values = new ArrayList<>();
