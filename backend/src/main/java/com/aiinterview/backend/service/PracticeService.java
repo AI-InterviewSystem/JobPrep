@@ -128,7 +128,7 @@ public class PracticeService {
             req.put("user_answer", answer.getAnswerText());
             req.put("practice_mode", true);
 
-            String aiResponse = aiApiClient.submitAnswer(req);
+            String aiResponse = aiApiClient.submitQuestionBankPracticeAnswer(session.getId().toString(), req);
             JsonNode root = objectMapper.readTree(aiResponse);
             JsonNode evaluation = root.has("evaluation") ? root.get("evaluation") : root;
 
@@ -151,7 +151,8 @@ public class PracticeService {
     }
 
     private void updateSessionAndMetrics(PracticeSession session, QuestionBank question, PracticeAnswer currentAnswer) {
-        List<PracticeAnswer> answers = practiceAnswerRepository.findAllByPracticeSessionId(session.getId());
+        List<PracticeAnswer> answers = new ArrayList<>(practiceAnswerRepository.findAllByPracticeSessionId(session.getId()));
+        answers.add(currentAnswer);
         int completed = answers.size();
         session.setCompletedQuestions(completed);
         if (session.getTotalQuestions() != null && completed >= session.getTotalQuestions()) {
