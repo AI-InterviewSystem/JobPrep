@@ -6,6 +6,7 @@ import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Getter
@@ -31,6 +32,9 @@ public class InterviewSessionResponse {
     private BigDecimal confidenceScore;
     private BigDecimal problemSolvingScore;
     private BigDecimal clarityScore;
+    private BigDecimal interviewScore;
+    private BigDecimal cvScore;
+    private Map<String, Object> scoringBreakdown;
     private List<String> strengths;
     private List<String> weaknesses;
     private String summaryText;

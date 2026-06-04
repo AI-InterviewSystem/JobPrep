@@ -77,6 +77,26 @@ public class AiApiClient {
         return postJson("/interview/summary", requestBody, "get interview summary", 3);
     }
 
+    public String startBehaviorMonitoring() {
+        return postJson("/behavior/start", Collections.emptyMap(), "start behavior monitoring", 2);
+    }
+
+    public String sendBehaviorFrame(byte[] frameBytes, String filename, String contentType,
+            String sessionId, String timestamp) {
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        body.add("session_id", sessionId);
+        body.add("file", buildFileResource(frameBytes, filename != null ? filename : "frame.jpg",
+                contentType != null ? contentType : "image/jpeg"));
+        if (timestamp != null && !timestamp.isBlank()) {
+            body.add("timestamp", timestamp);
+        }
+        return postMultipart("/behavior/frame", body);
+    }
+
+    public String endBehaviorMonitoring(Map<String, Object> requestBody) {
+        return postJson("/behavior/end", requestBody, "end behavior monitoring", 2);
+    }
+
     public String checkCvJd(Map<String, Object> requestBody) {
         return postJson("/check-cv-jd", requestBody, "check CV/JD", 2);
     }

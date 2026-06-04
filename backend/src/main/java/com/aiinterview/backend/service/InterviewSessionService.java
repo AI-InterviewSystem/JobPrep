@@ -78,17 +78,20 @@ public class InterviewSessionService {
     }
 
     @Transactional
-    public InterviewSessionResponse startSession(UUID sessionId, String userEmail, StartInterviewSessionRequest startRequest) {
+    public InterviewSessionResponse startSession(UUID sessionId, String userEmail,
+            StartInterviewSessionRequest startRequest) {
         InterviewSession session = findSession(sessionId, userEmail);
         User user = session.getUser();
         List<InterviewQuestion> existingQuestions = questionRepository.findBySessionIdOrderByOrderIndexAsc(sessionId);
-        if (session.getStatus() == InterviewStatus.IN_PROGRESS && session.getAiSessionId() != null && !existingQuestions.isEmpty()) {
+        if (session.getStatus() == InterviewStatus.IN_PROGRESS && session.getAiSessionId() != null
+                && !existingQuestions.isEmpty()) {
             return buildResponse(session, existingQuestions);
         }
 
         Map<String, Object> cvDataObj = cvUploadService.getCvDataForAi(user);
         if (cvDataObj == null || cvDataObj.isEmpty()) {
-            throw new AppException("No parsed CV data found. Upload a CV and wait for AI parsing before starting the interview.");
+            throw new AppException(
+                    "No parsed CV data found. Upload a CV and wait for AI parsing before starting the interview.");
         }
 
         String interviewType = mapInterviewType(startRequest != null ? startRequest.getInterviewType() : null);
@@ -110,7 +113,8 @@ public class InterviewSessionService {
             req.put("num_questions", numQuestions);
             req.put("passing_score", 0);
 
-            log.info("Starting AI interview session. sessionId={}, interviewType={}, interviewLevel={}, hasJobDescription={}",
+            log.info(
+                    "Starting AI interview session. sessionId={}, interviewType={}, interviewLevel={}, hasJobDescription={}",
                     sessionId, interviewType, interviewLevel, session.getJobDescription() != null);
             String aiResponse = aiApiClient.startInterview(req);
 
@@ -129,7 +133,8 @@ public class InterviewSessionService {
             session.setTotalQuestions(numQuestions);
             session.setCompletedQuestions(0);
             if (session.getRoleSnapshot() == null && session.getJobDescription() != null) {
-                session.setRoleSnapshot(inferRoleFromJobDescription(session.getJobDescription().getJobDescriptionText()));
+                session.setRoleSnapshot(
+                        inferRoleFromJobDescription(session.getJobDescription().getJobDescriptionText()));
             }
             session.setTitle(buildSessionTitle(session.getRoleSnapshot(), interviewLevel));
             InterviewSession saved = sessionRepository.save(session);
@@ -242,17 +247,21 @@ public class InterviewSessionService {
             }
             return SubmitAnswerResponse.builder().answerId(savedAnswer.getId()).build();
         } catch (AiApiClient.AiProviderRateLimitException e) {
-            log.warn("AI provider rate-limited while submitting answer for session {}. Saving answer and continuing with a predefined question.",
+            log.warn(
+                    "AI provider rate-limited while submitting answer for session {}. Saving answer and continuing with a predefined question.",
                     sessionId);
-            answer.setFeedback("AI evaluation is temporarily unavailable because the AI provider is rate-limited. This answer was saved and can be reviewed later.");
+            answer.setFeedback(
+                    "AI evaluation is temporarily unavailable because the AI provider is rate-limited. This answer was saved and can be reviewed later.");
             InterviewAnswer savedAnswer = answerRepository.save(answer);
             updateQuestionProgress(session);
             createFallbackQuestionIfNeeded(session, question, "AI provider rate-limited");
             return SubmitAnswerResponse.builder().answerId(savedAnswer.getId()).build();
         } catch (AiApiClient.AiProviderInvalidResponseException e) {
-            log.warn("AI provider returned invalid answer response for session {}. Saving answer and continuing with a predefined question.",
+            log.warn(
+                    "AI provider returned invalid answer response for session {}. Saving answer and continuing with a predefined question.",
                     sessionId);
-            answer.setFeedback("AI evaluation is temporarily unavailable because the AI service returned an invalid response. This answer was saved and can be reviewed later.");
+            answer.setFeedback(
+                    "AI evaluation is temporarily unavailable because the AI service returned an invalid response. This answer was saved and can be reviewed later.");
             InterviewAnswer savedAnswer = answerRepository.save(answer);
             updateQuestionProgress(session);
             createFallbackQuestionIfNeeded(session, question, "AI response invalid");
@@ -278,6 +287,42 @@ public class InterviewSessionService {
                 JsonNode finalRes = resNode.get("final_result");
                 if (finalRes.has("overall_score")) {
                     session.setOverallScore(new BigDecimal(finalRes.get("overall_score").asText()));
+                }
+                // interview_score: raw interview component score (before weighting)
+                if (finalRes.has("interview_score") && !finalRes.get("interview_score").isNull()) {
+                    try {
+                        session.setInterviewScore(new BigDecimal(finalRes.get("interview_score").asText()));
+                    } catch (NumberFormatException ignored) {
+                    }
+                }
+                // scoring_breakdown may live at root or inside final_result
+                JsonNode breakdownNode = finalRes.has("scoring_breakdown")
+                        && !finalRes.get("scoring_breakdown").isNull()
+                                ? finalRes.get("scoring_breakdown")
+                                : (resNode.has("scoring_breakdown") && !resNode.get("scoring_breakdown").isNull()
+                                        ? resNode.get("scoring_breakdown")
+                                        : null);
+                if (breakdownNode != null) {
+                    if (breakdownNode.has("cv_score") && !breakdownNode.get("cv_score").isNull()) {
+                        try {
+                            session.setCvScore(new BigDecimal(breakdownNode.get("cv_score").asText()));
+                        } catch (NumberFormatException ignored) {
+                        }
+                    }
+                    if (session.getInterviewScore() == null && breakdownNode.has("interview_score")
+                            && !breakdownNode.get("interview_score").isNull()) {
+                        try {
+                            session.setInterviewScore(new BigDecimal(breakdownNode.get("interview_score").asText()));
+                        } catch (NumberFormatException ignored) {
+                        }
+                    }
+                    try {
+                        @SuppressWarnings("unchecked")
+                        java.util.Map<String, Object> bMap = objectMapper.convertValue(breakdownNode,
+                                java.util.Map.class);
+                        session.setScoringBreakdown(bMap);
+                    } catch (Exception ignored) {
+                    }
                 }
                 session.setTechnicalScore(decimalFromFirst(finalRes, "technical_score", "technical"));
                 session.setCommunicationScore(decimalFromFirst(finalRes, "communication_score", "communication"));
@@ -313,7 +358,8 @@ public class InterviewSessionService {
             List<InterviewQuestion> questions = questionRepository.findBySessionIdOrderByOrderIndexAsc(sessionId);
             return buildResponse(saved, questions);
         } catch (AiApiClient.AiProviderRateLimitException e) {
-            log.warn("AI provider rate-limited while generating summary for session {}. Completing with partial summary.",
+            log.warn(
+                    "AI provider rate-limited while generating summary for session {}. Completing with partial summary.",
                     sessionId);
             return completeWithPartialSummary(session, sessionId,
                     "AI summary is temporarily unavailable because the AI provider is rate-limited. Your interview answers were saved.",
@@ -361,18 +407,17 @@ public class InterviewSessionService {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new AppException("User not found"));
         return sessionRepository.searchHistory(
-                        user.getId(),
-                        cleanBlank(keyword),
-                        cleanBlank(status),
-                        fromDate,
-                        toDate,
-                        minScore,
-                        maxScore,
-                        cleanBlank(role),
-                        cleanBlank(level),
-                        cleanBlank(interviewType),
-                        cleanBlank(topic)
-                )
+                user.getId(),
+                cleanBlank(keyword),
+                cleanBlank(status),
+                fromDate,
+                toDate,
+                minScore,
+                maxScore,
+                cleanBlank(role),
+                cleanBlank(level),
+                cleanBlank(interviewType),
+                cleanBlank(topic))
                 .stream()
                 .map(s -> buildResponse(s, Collections.emptyList()))
                 .collect(Collectors.toList());
@@ -403,7 +448,8 @@ public class InterviewSessionService {
         questionRepository.save(q);
     }
 
-    private void createFallbackQuestionIfNeeded(InterviewSession session, InterviewQuestion answeredQuestion, String reason) {
+    private void createFallbackQuestionIfNeeded(InterviewSession session, InterviewQuestion answeredQuestion,
+            String reason) {
         int currentIndex = answeredQuestion.getOrderIndex() != null ? answeredQuestion.getOrderIndex() : 1;
         if (currentIndex >= 5) {
             return;
@@ -424,15 +470,19 @@ public class InterviewSessionService {
 
     private String fallbackQuestionText(int orderIndex) {
         return switch (orderIndex) {
-            case 2 -> "Describe a project or responsibility from your CV that best matches this role. What was your specific contribution?";
-            case 3 -> "Tell me about a difficult technical or workplace problem you handled. How did you approach it and what was the result?";
-            case 4 -> "Which skill from your CV would you most want to demonstrate in this position, and how have you applied it in practice?";
+            case 2 ->
+                "Describe a project or responsibility from your CV that best matches this role. What was your specific contribution?";
+            case 3 ->
+                "Tell me about a difficult technical or workplace problem you handled. How did you approach it and what was the result?";
+            case 4 ->
+                "Which skill from your CV would you most want to demonstrate in this position, and how have you applied it in practice?";
             case 5 -> "What would you improve in your previous work if you had more time or resources, and why?";
             default -> "Tell me about your background and how it relates to this role.";
         };
     }
 
-    private InterviewSessionResponse completeWithPartialSummary(InterviewSession session, UUID sessionId, String message, String aiStatus) {
+    private InterviewSessionResponse completeWithPartialSummary(InterviewSession session, UUID sessionId,
+            String message, String aiStatus) {
         List<InterviewQuestion> questions = questionRepository.findBySessionIdOrderByOrderIndexAsc(sessionId);
         List<InterviewAnswer> answers = answerRepository.findAll().stream()
                 .filter(answer -> answer.getQuestion() != null
@@ -454,7 +504,8 @@ public class InterviewSessionService {
         if (session.getWeaknesses() == null || session.getWeaknesses().isEmpty()) {
             session.setWeaknesses(List.of("AI-generated detailed feedback is unavailable for this attempt."));
         }
-        session.setNextSteps(aiStatus + ": Retry the interview summary later after the AI provider is available, or review the saved answers manually.");
+        session.setNextSteps(aiStatus
+                + ": Retry the interview summary later after the AI provider is available, or review the saved answers manually.");
         session.setStatus(InterviewStatus.COMPLETED);
         session.setEndTime(LocalDateTime.now());
         updateSessionCompletionMetrics(session, questions);
@@ -465,9 +516,11 @@ public class InterviewSessionService {
     }
 
     private InterviewSessionResponse buildResponse(InterviewSession session, List<InterviewQuestion> questions) {
-        Map<UUID, InterviewAnswer> answersByQuestionId = answerRepository.findByQuestionSessionId(session.getId()).stream()
+        Map<UUID, InterviewAnswer> answersByQuestionId = answerRepository.findByQuestionSessionId(session.getId())
+                .stream()
                 .filter(answer -> answer.getQuestion() != null)
-                .collect(Collectors.toMap(answer -> answer.getQuestion().getId(), answer -> answer, (first, second) -> second));
+                .collect(Collectors.toMap(answer -> answer.getQuestion().getId(), answer -> answer,
+                        (first, second) -> second));
         Map<UUID, List<InterviewRecording>> recordingsByQuestionId = recordingRepository
                 .findBySessionIdAndDeletedAtIsNullOrderByCreatedAtAsc(session.getId())
                 .stream()
@@ -507,6 +560,9 @@ public class InterviewSessionService {
                 .confidenceScore(session.getConfidenceScore())
                 .problemSolvingScore(session.getProblemSolvingScore())
                 .clarityScore(session.getClarityScore())
+                .interviewScore(session.getInterviewScore())
+                .cvScore(session.getCvScore())
+                .scoringBreakdown(session.getScoringBreakdown())
                 .strengths(session.getStrengths())
                 .weaknesses(session.getWeaknesses())
                 .summaryText(session.getSummaryText())
@@ -574,11 +630,16 @@ public class InterviewSessionService {
             return;
         }
         BigDecimal score = average.divide(BigDecimal.valueOf(scoredCount), 2, java.math.RoundingMode.HALF_UP);
-        if (session.getTechnicalScore() == null) session.setTechnicalScore(score);
-        if (session.getCommunicationScore() == null) session.setCommunicationScore(score);
-        if (session.getConfidenceScore() == null) session.setConfidenceScore(score);
-        if (session.getProblemSolvingScore() == null) session.setProblemSolvingScore(score);
-        if (session.getClarityScore() == null) session.setClarityScore(score);
+        if (session.getTechnicalScore() == null)
+            session.setTechnicalScore(score);
+        if (session.getCommunicationScore() == null)
+            session.setCommunicationScore(score);
+        if (session.getConfidenceScore() == null)
+            session.setConfidenceScore(score);
+        if (session.getProblemSolvingScore() == null)
+            session.setProblemSolvingScore(score);
+        if (session.getClarityScore() == null)
+            session.setClarityScore(score);
     }
 
     private BigDecimal decimalFromFirst(JsonNode node, String... fieldNames) {
@@ -665,7 +726,8 @@ public class InterviewSessionService {
         if (session.getNextSteps() != null && session.getNextSteps().startsWith("AI_")) {
             return session.getSummaryText();
         }
-        boolean hasFallbackQuestion = questions.stream().anyMatch(q -> q.getQuestionSource() == QuestionSource.PRE_DEFINED);
+        boolean hasFallbackQuestion = questions.stream()
+                .anyMatch(q -> q.getQuestionSource() == QuestionSource.PRE_DEFINED);
         if (hasFallbackQuestion) {
             return "AI provider was temporarily unavailable for one or more turns, so predefined backup questions were used.";
         }
