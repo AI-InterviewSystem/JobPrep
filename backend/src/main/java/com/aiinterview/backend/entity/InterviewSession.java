@@ -10,6 +10,7 @@ import org.hibernate.type.SqlTypes;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Entity
@@ -94,6 +95,16 @@ public class InterviewSession {
 
     @Column(name = "clarity_score", precision = 5, scale = 2)
     private BigDecimal clarityScore;
+
+    @Column(name = "interview_score", precision = 5, scale = 2)
+    private BigDecimal interviewScore;
+
+    @Column(name = "cv_score", precision = 5, scale = 2)
+    private BigDecimal cvScore;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "scoring_breakdown", columnDefinition = "jsonb")
+    private Map<String, Object> scoringBreakdown;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "strengths", columnDefinition = "jsonb")

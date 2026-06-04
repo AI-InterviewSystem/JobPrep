@@ -223,6 +223,29 @@ export const interviewSessionApi = {
     delete: (id) => api.delete(`/interview-sessions/${id}`),
 };
 
+export const behaviorApi = {
+    /** Start a new behavior monitoring session on the AI server */
+    start: () => api.post('/behavior/start'),
+
+    /** Upload one webcam frame for face/gaze analysis
+     * @param {string} sessionId  behavior session id from /behavior/start
+     * @param {Blob}   frameBlob  JPEG/PNG image blob
+     * @param {number} [timestamp] optional unix timestamp in seconds
+     */
+    sendFrame: (sessionId, frameBlob, timestamp) => {
+        const formData = new FormData();
+        formData.append('session_id', sessionId);
+        formData.append('file', frameBlob, 'frame.jpg');
+        if (timestamp != null) formData.append('timestamp', String(timestamp));
+        return api.post('/behavior/frame', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+    },
+
+    /** End a behavior monitoring session and get the full behavior report */
+    end: (sessionId) => api.post('/behavior/end', { session_id: sessionId }),
+};
+
 export const aiHelpersApi = {
     checkCvJd: (data) => api.post('/ai-helpers/check-cv-jd', data),
     checkCurrentCvJd: (data) => api.post('/ai-helpers/check-current-cv-jd', data),

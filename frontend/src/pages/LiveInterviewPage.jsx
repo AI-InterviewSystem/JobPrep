@@ -1,21 +1,56 @@
 import { useNavigate, useLocation } from "react-router-dom"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { interviewSessionApi } from "../services/api"
+import { interviewSessionApi, behaviorApi } from "../services/api"
 
 const DEFAULT_TOTAL_QUESTIONS = 5
 const INITIAL_QUESTION = 1
+const FRAME_INTERVAL_MS = 2000   // capture a webcam frame every 2 seconds
 
 const aiMessage = `AI: "Thank you for that background. Now, regarding your experience..."`
+
+// ─── Behavior warning overlay ────────────────────────────────────────────────
+function BehaviorWarningBanner({ warnings }) {
+    if (!warnings || warnings.length === 0) return null
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="absolute top-3 left-3 right-3 z-10 bg-red-600/90 backdrop-blur-sm text-white text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-2"
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M5.07 19H19a2 2 0 001.73-3L13.73 4a2 2 0 00-3.46 0L3.27 16A2 2 0 005.07 19z" />
+            </svg>
+            <span>{warnings[warnings.length - 1]}</span>
+        </motion.div>
+    )
+}
+
+// ─── Behavior status indicator ───────────────────────────────────────────────
+function BehaviorStatusDot({ faceCount, isLookingAway }) {
+    let color = "bg-green-400"
+    let label = "Face OK"
+    if (faceCount === 0) { color = "bg-red-500"; label = "No Face" }
+    else if (faceCount > 1) { color = "bg-yellow-400"; label = "Multiple Faces" }
+    else if (isLookingAway) { color = "bg-orange-400"; label = "Looking Away" }
+
+    return (
+        <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5 bg-black/50 backdrop-blur-sm px-2 py-1 rounded-full">
+            <span className={`w-2 h-2 rounded-full ${color} animate-pulse`} />
+            <span className="text-white text-[10px] font-semibold uppercase tracking-wide">{label}</span>
+        </div>
+    )
+}
 
 export default function LiveInterviewPage() {
     const navigate = useNavigate()
     const location = useLocation()
     const videoRef = useRef(null)
+    const canvasRef = useRef(null)
 
     const [sessionId, setSessionId] = useState(null)
     const [session, setSession] = useState(null)
-    // Permission UI state (may be used later for error display / placeholders)
     const [permissionsGranted, setPermissionsGranted] = useState(false)
     const [permissionLoading, setPermissionLoading] = useState(false)
     const [permissionError, setPermissionError] = useState("")
@@ -35,32 +70,36 @@ export default function LiveInterviewPage() {
     const [isAiMuted, setIsAiMuted] = useState(false)
     const [isAiSpeaking, setIsAiSpeaking] = useState(false)
 
+    // ── Behavior monitoring state ─────────────────────────────────────────
+    const [behaviorSessionId, setBehaviorSessionId] = useState(null)
+    const [behaviorWarnings, setBehaviorWarnings] = useState([])
+    const [behaviorFaceCount, setBehaviorFaceCount] = useState(1)
+    const [behaviorLookingAway, setBehaviorLookingAway] = useState(false)
+    const behaviorSessionIdRef = useRef(null)   // kept in sync with state for callbacks
+    const frameIntervalRef = useRef(null)
+
     const mediaRecorderRef = useRef(null)
     const audioChunksRef = useRef([])
     const recognitionRef = useRef(null)
     const transcriptRef = useRef("")
     const questionStartTimeRef = useRef(null)
 
+    // ── Keep behavior session ref in sync ─────────────────────────────────
+    useEffect(() => { behaviorSessionIdRef.current = behaviorSessionId }, [behaviorSessionId])
+
+    // ── Session loading ───────────────────────────────────────────────────
     useEffect(() => {
         const loadSession = async () => {
             const params = new URLSearchParams(location.search)
             const urlSessionId = params.get("sessionId")
-            if (urlSessionId) {
-                setSessionId(urlSessionId)
-                return
-            }
+            if (urlSessionId) { setSessionId(urlSessionId); return }
 
             const stored = localStorage.getItem("interview_setup")
             if (stored) {
                 try {
                     const parsed = JSON.parse(stored)
-                    if (parsed?.sessionId) {
-                        setSessionId(parsed.sessionId)
-                        return
-                    }
-                } catch {
-                    // ignore malformed local storage data
-                }
+                    if (parsed?.sessionId) { setSessionId(parsed.sessionId); return }
+                } catch { /* ignore malformed */ }
             }
 
             try {
@@ -72,53 +111,110 @@ export default function LiveInterviewPage() {
                 setPermissionError("Unable to create the interview session. Please refresh and try again.")
             }
         }
-
         loadSession()
     }, [location.search])
 
+    // ── Timers ────────────────────────────────────────────────────────────
     useEffect(() => {
         if (!sessionStarted || isPaused) return
-
         const t1 = setInterval(() => setSeconds((prev) => prev + 1), 1000)
         const t2 = setInterval(() => setSessionSecondsLeft((prev) => Math.max(0, prev - 1)), 1000)
-        return () => {
-            clearInterval(t1)
-            clearInterval(t2)
-        }
+        return () => { clearInterval(t1); clearInterval(t2) }
     }, [isPaused, sessionStarted])
 
+    // ── Video element ─────────────────────────────────────────────────────
     useEffect(() => {
         if (videoRef.current && mediaStream) {
             videoRef.current.srcObject = mediaStream
         }
     }, [mediaStream])
 
+    // ── Auto-request media permissions once session id is available ───────
     useEffect(() => {
         if (!sessionId) return
         requestMediaPermissions()
     }, [sessionId])
 
+    // ── Start behavior monitoring when interview session starts ───────────
+    useEffect(() => {
+        if (!sessionStarted || !permissionsGranted) return
+
+        let cancelled = false
+        const start = async () => {
+            try {
+                const res = await behaviorApi.start()
+                if (cancelled) return
+                const id = res.data?.session_id
+                if (id) {
+                    setBehaviorSessionId(id)
+                    console.log("[Behavior] session started:", id)
+                }
+            } catch (err) {
+                console.warn("[Behavior] failed to start monitoring session:", err)
+            }
+        }
+        start()
+        return () => { cancelled = true }
+    }, [sessionStarted, permissionsGranted])
+
+    // ── Periodic frame capture ────────────────────────────────────────────
+    const captureAndSendFrame = useCallback(async () => {
+        const bId = behaviorSessionIdRef.current
+        if (!bId || !videoRef.current || !canvasRef.current) return
+
+        const video = videoRef.current
+        if (video.readyState < 2 || video.videoWidth === 0) return
+
+        const canvas = canvasRef.current
+        canvas.width = 320
+        canvas.height = 180
+        const ctx = canvas.getContext("2d")
+        ctx.drawImage(video, 0, 0, 320, 180)
+
+        canvas.toBlob(async (blob) => {
+            if (!blob) return
+            try {
+                const res = await behaviorApi.sendFrame(bId, blob, Date.now() / 1000)
+                const data = res.data
+                if (data) {
+                    setBehaviorFaceCount(data.face_count ?? 1)
+                    setBehaviorLookingAway(data.is_looking_away ?? false)
+                    if (Array.isArray(data.warnings) && data.warnings.length > 0) {
+                        setBehaviorWarnings(data.warnings)
+                    } else {
+                        setBehaviorWarnings([])
+                    }
+                }
+            } catch (err) {
+                // silently skip failed frames
+                console.warn("[Behavior] frame upload error:", err?.message)
+            }
+        }, "image/jpeg", 0.7)
+    }, [])
+
+    useEffect(() => {
+        if (!behaviorSessionId || !sessionStarted) return
+        frameIntervalRef.current = setInterval(captureAndSendFrame, FRAME_INTERVAL_MS)
+        return () => clearInterval(frameIntervalRef.current)
+    }, [behaviorSessionId, sessionStarted, captureAndSendFrame])
+
+    // ── Media recorder setup ──────────────────────────────────────────────
     useEffect(() => {
         if (!sessionStarted || !mediaStream) return
-
         if (!window.MediaRecorder) {
             setRecordingError("Your browser does not support recording for this interview.")
             return
         }
-
         try {
             const mimeType = getSupportedRecordingMimeType()
             const recorder = new MediaRecorder(mediaStream, mimeType ? { mimeType } : undefined)
             recorder.ondataavailable = (event) => {
-                if (event.data && event.data.size > 0) {
-                    audioChunksRef.current.push(event.data)
-                }
+                if (event.data && event.data.size > 0) audioChunksRef.current.push(event.data)
             }
             recorder.onerror = (event) => {
                 console.error("MediaRecorder error", event)
                 setRecordingError("Recording failed. Your session will continue without a saved video file.")
             }
-
             mediaRecorderRef.current = recorder
             audioChunksRef.current = []
             setRecordingError("")
@@ -127,7 +223,6 @@ export default function LiveInterviewPage() {
             console.error("Failed to initialize recorder", err)
             setRecordingError("Unable to initialize the interview recorder.")
         }
-
         return () => {
             if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
                 mediaRecorderRef.current.stop()
@@ -137,122 +232,88 @@ export default function LiveInterviewPage() {
         }
     }, [sessionStarted, mediaStream])
 
+    // ── Speech recognition ────────────────────────────────────────────────
     useEffect(() => {
         if (!sessionStarted || isSubmittingAnswer || isPaused || isAiSpeaking) {
             if (recognitionRef.current) {
-                try {
-                    recognitionRef.current.stop()
-                } catch (e) {
-                    // Ignore already stopped
-                }
+                try { recognitionRef.current.stop() } catch (e) { /* ignore */ }
             }
             return
         }
-
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-        if (!SpeechRecognition) {
-            setSupportSpeechRecognition(false)
-            return
-        }
+        if (!SpeechRecognition) { setSupportSpeechRecognition(false); return }
 
         setSupportSpeechRecognition(true)
         const recognition = new SpeechRecognition()
         recognition.continuous = true
         recognition.interimResults = true
         recognition.lang = "en-US"
-
         recognition.onresult = (event) => {
             let interimTranscript = ""
             let finalTranscript = transcriptRef.current
             for (let i = event.resultIndex; i < event.results.length; i += 1) {
                 const result = event.results[i]
                 const transcript = result[0].transcript
-                if (result.isFinal) {
-                    finalTranscript += transcript + " "
-                } else {
-                    interimTranscript += transcript
-                }
+                if (result.isFinal) { finalTranscript += transcript + " " }
+                else { interimTranscript += transcript }
             }
             transcriptRef.current = finalTranscript
             setCurrentTranscript(finalTranscript + interimTranscript)
         }
-
-        recognition.onerror = (event) => {
-            console.error("SpeechRecognition error", event)
-        }
-
+        recognition.onerror = (event) => console.error("SpeechRecognition error", event)
         recognition.onend = () => {
-            // Only restart if none of the stopping conditions are met
             if (sessionStarted && !isSubmittingAnswer && !isPaused && !isAiSpeaking) {
-                try {
-                    recognition.start()
-                } catch (err) {
-                    console.error("Failed to restart speech recognition", err)
-                }
+                try { recognition.start() } catch (err) { console.error("Failed to restart speech recognition", err) }
             }
         }
-
-        try {
-            recognition.start()
-        } catch (err) {
-            console.error("Failed to start speech recognition", err)
-        }
+        try { recognition.start() } catch (err) { console.error("Failed to start speech recognition", err) }
         recognitionRef.current = recognition
-
         return () => {
             recognition.onend = null
-            try {
-                recognition.stop()
-            } catch (e) { }
+            try { recognition.stop() } catch (e) { }
             recognitionRef.current = null
         }
     }, [sessionStarted, isSubmittingAnswer, isPaused, isAiSpeaking])
 
+    // ── Cleanup media stream ──────────────────────────────────────────────
     useEffect(() => {
         return () => {
-            if (mediaStream) {
-                mediaStream.getTracks().forEach((track) => track.stop())
-            }
+            if (mediaStream) mediaStream.getTracks().forEach((track) => track.stop())
         }
     }, [mediaStream])
 
+    // ── Cleanup behavior monitoring on unmount ────────────────────────────
+    useEffect(() => {
+        return () => {
+            clearInterval(frameIntervalRef.current)
+            const bId = behaviorSessionIdRef.current
+            if (bId) {
+                behaviorApi.end(bId).catch(() => { /* best-effort */ })
+            }
+        }
+    }, [])
 
-
+    // ── AI voice ─────────────────────────────────────────────────────────
     useEffect(() => {
         if (!sessionStarted || !currentQuestionText || isAiMuted || isPaused) {
-            window.speechSynthesis.cancel()
-            return
+            window.speechSynthesis.cancel(); return
         }
-
         const speak = () => {
             window.speechSynthesis.cancel()
             const utterance = new SpeechSynthesisUtterance(currentQuestionText)
-            utterance.lang = "en-US"
-            utterance.rate = 0.95
-            utterance.pitch = 1.0
-
+            utterance.lang = "en-US"; utterance.rate = 0.95; utterance.pitch = 1.0
             utterance.onstart = () => setIsAiSpeaking(true)
             utterance.onend = () => setIsAiSpeaking(false)
             utterance.onerror = () => setIsAiSpeaking(false)
-
             const voices = window.speechSynthesis.getVoices()
-            // Prefer a natural sounding google voice if available
             const voice = voices.find(v => v.lang.startsWith("en") && (v.name.includes("Google") || v.name.includes("Natural"))) || voices[0]
             if (voice) utterance.voice = voice
-
             window.speechSynthesis.speak(utterance)
         }
-
         if (window.speechSynthesis.getVoices().length === 0) {
             window.speechSynthesis.onvoiceschanged = speak
-        } else {
-            speak()
-        }
-
-        return () => {
-            window.speechSynthesis.cancel()
-            setIsAiSpeaking(false)
-        }
+        } else { speak() }
+        return () => { window.speechSynthesis.cancel(); setIsAiSpeaking(false) }
     }, [questionNum, sessionStarted, isAiMuted, isPaused])
 
     const fmt = (secs) => {
@@ -267,25 +328,15 @@ export default function LiveInterviewPage() {
 
     const getSupportedRecordingMimeType = () => {
         if (!window.MediaRecorder || !MediaRecorder.isTypeSupported) return ""
-        const types = [
-            "video/webm;codecs=vp9,opus",
-            "video/webm;codecs=vp8,opus",
-            "video/webm",
-            "audio/webm",
-        ]
+        const types = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm", "audio/webm"]
         return types.find((type) => MediaRecorder.isTypeSupported(type)) || ""
     }
 
     const startQuestionCapture = () => {
         if (!mediaRecorderRef.current || mediaRecorderRef.current.state !== "inactive") return
-
         audioChunksRef.current = []
         questionStartTimeRef.current = Date.now()
-
-        try {
-            mediaRecorderRef.current.start()
-            setIsRecording(true)
-        } catch (err) {
+        try { mediaRecorderRef.current.start(); setIsRecording(true) } catch (err) {
             console.error("Failed to start recording", err)
             setRecordingError("Unable to start recording for the current response.")
         }
@@ -293,10 +344,7 @@ export default function LiveInterviewPage() {
 
     const stopQuestionCapture = () => {
         return new Promise((resolve) => {
-            if (!mediaRecorderRef.current || mediaRecorderRef.current.state === "inactive") {
-                return resolve(null)
-            }
-
+            if (!mediaRecorderRef.current || mediaRecorderRef.current.state === "inactive") return resolve(null)
             const recorder = mediaRecorderRef.current
             recorder.onstop = () => {
                 const blob = new Blob(audioChunksRef.current, { type: audioChunksRef.current[0]?.type || "video/webm" })
@@ -314,7 +362,6 @@ export default function LiveInterviewPage() {
 
     const uploadRecordingBlob = async (blob, questionId, answerId, durationSeconds, transcriptText) => {
         if (!blob || blob.size === 0) return null
-
         const isVideo = (blob.type || "").startsWith("video/")
         const file = new File([blob], `interview-answer-${questionId}.webm`, { type: blob.type || "video/webm" })
         const formData = new FormData()
@@ -324,7 +371,6 @@ export default function LiveInterviewPage() {
         formData.append("recordingType", isVideo ? "video" : "audio")
         formData.append("durationSeconds", String(durationSeconds || 0))
         formData.append("transcriptText", transcriptText || "")
-
         try {
             const uploadRes = await interviewSessionApi.uploadRecording(sessionId, formData)
             return uploadRes.data
@@ -341,10 +387,8 @@ export default function LiveInterviewPage() {
             setPermissionError("No AI question is available for this session. Please restart from the setup page.")
             return false
         }
-
         setIsSubmittingAnswer(true)
         setRecordingError("")
-
         const answerText = currentTranscript || ""
         const durationSeconds = getCurrentQuestionDuration()
         const recordingBlob = await stopQuestionCapture()
@@ -354,7 +398,6 @@ export default function LiveInterviewPage() {
             inputType: recordingBlob && recordingBlob.size > 0 ? "VIDEO" : "TEXT",
             durationSeconds,
         }
-
         try {
             const answerRes = await interviewSessionApi.submitAnswer(sessionId, answerData)
             await uploadRecordingBlob(recordingBlob, currentQuestion.id, answerRes.data?.answerId, durationSeconds, answerText)
@@ -373,11 +416,31 @@ export default function LiveInterviewPage() {
         }
     }
 
+    // ── Complete interview: stop behavior monitoring, then navigate ────────
     const completeInterviewSession = async () => {
+        // Stop frame capture
+        clearInterval(frameIntervalRef.current)
+        frameIntervalRef.current = null
+
+        // Fetch behavior report
+        let behaviorReport = null
+        const bId = behaviorSessionIdRef.current
+        if (bId) {
+            try {
+                const endRes = await behaviorApi.end(bId)
+                behaviorReport = endRes.data
+                console.log("[Behavior] report:", behaviorReport)
+                setBehaviorSessionId(null)
+                behaviorSessionIdRef.current = null
+            } catch (err) {
+                console.warn("[Behavior] failed to fetch end report:", err)
+            }
+        }
+
         try {
             const completeRes = await interviewSessionApi.complete(sessionId)
             localStorage.removeItem("interview_setup")
-            navigate("/interview-result", { state: { session: completeRes.data } })
+            navigate("/interview-result", { state: { session: completeRes.data, behaviorReport } })
         } catch (err) {
             console.error("Failed to complete interview session", err)
             setPermissionError("Unable to finish the interview. Please try again.")
@@ -386,16 +449,11 @@ export default function LiveInterviewPage() {
 
     const handleNext = async () => {
         if (isSubmittingAnswer) return
-
         const submitted = await submitCurrentAnswer()
         if (!submitted) return
-
-        // After submitting, session has been refreshed inside submitCurrentAnswer
-        // The new question was saved to DB and returned in the updated session
         const latestSession = await interviewSessionApi.get(sessionId)
         const updatedSession = latestSession.data
         setSession(updatedSession)
-
         const availableQuestions = updatedSession?.questions?.length || DEFAULT_TOTAL_QUESTIONS
         if (questionNum < availableQuestions) {
             transcriptRef.current = ""
@@ -408,7 +466,6 @@ export default function LiveInterviewPage() {
 
     const handleEndInterview = async () => {
         if (isSubmittingAnswer) return
-
         const submitted = await submitCurrentAnswer()
         if (!submitted) return
         await completeInterviewSession()
@@ -427,17 +484,11 @@ export default function LiveInterviewPage() {
                 setPermissionError("")
                 return
             }
-
             let setup = null
             const stored = localStorage.getItem("interview_setup")
             if (stored) {
-                try {
-                    setup = JSON.parse(stored)
-                } catch {
-                    setup = null
-                }
+                try { setup = JSON.parse(stored) } catch { setup = null }
             }
-
             const startRes = await interviewSessionApi.start(id, {
                 interviewType: setup?.selectedType || "Technical",
                 interviewLevel: setup?.selectedLevel || "Junior",
@@ -454,22 +505,16 @@ export default function LiveInterviewPage() {
     }
 
     const requestMediaPermissions = async () => {
-        // Auto called on page load; permission UI state is used for error display below.
-        // This function is intentionally kept stable to avoid re-creating streams.
-
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             setPermissionError("Your browser does not support camera and microphone access.")
             return
         }
-
         if (!sessionId) {
             setPermissionError("No active interview session found. Please start again from the setup page.")
             return
         }
-
         setPermissionLoading(true)
         setPermissionError("")
-
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
             setMediaStream(stream)
@@ -487,11 +532,11 @@ export default function LiveInterviewPage() {
         }
     }
 
-
-
     return (
         <div className="min-h-screen bg-gray-50 font-display flex flex-col">
-            {/* Top bar */}
+            {/* Hidden canvas for frame capture */}
+            <canvas ref={canvasRef} style={{ display: "none" }} />
+
             <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-8">
                 {/* Session Status Bar */}
                 <div className="flex flex-wrap items-center justify-between gap-4 mb-6 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
@@ -505,12 +550,18 @@ export default function LiveInterviewPage() {
                                 Active
                             </span>
                         </div>
+                        {/* Behavior monitoring indicator */}
+                        {behaviorSessionId && (
+                            <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500 bg-gray-50 px-2 py-1 rounded-lg">
+                                <span className={`w-2 h-2 rounded-full animate-pulse ${behaviorFaceCount === 0 ? "bg-red-500" : behaviorFaceCount > 1 ? "bg-yellow-400" : behaviorLookingAway ? "bg-orange-400" : "bg-green-400"}`} />
+                                Camera Monitor
+                            </div>
+                        )}
                     </div>
                     <div className="flex items-center gap-3">
                         <button
                             onClick={() => setIsAiMuted(prev => !prev)}
-                            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors border ${isAiMuted ? "bg-red-50 border-red-100 text-red-500" : "bg-gray-50 border-gray-100 text-gray-600 hover:bg-gray-100"
-                                }`}
+                            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors border ${isAiMuted ? "bg-red-50 border-red-100 text-red-500" : "bg-gray-50 border-gray-100 text-gray-600 hover:bg-gray-100"}`}
                             title={isAiMuted ? "Unmute AI Voice" : "Mute AI Voice"}
                         >
                             {isAiMuted ? (
@@ -543,10 +594,11 @@ export default function LiveInterviewPage() {
                         </button>
                     </div>
                 </div>
+
                 <div className="grid lg:grid-cols-5 gap-6">
                     {/* Left - AI Interviewer Video + Transcription */}
                     <div className="lg:col-span-3 space-y-5">
-                        {/* AI Video feed (interviewer camera) */}
+                        {/* AI/Webcam video feed */}
                         <div className="relative rounded-2xl overflow-hidden bg-gray-800 aspect-video">
                             <video
                                 ref={videoRef}
@@ -568,8 +620,23 @@ export default function LiveInterviewPage() {
                                 </div>
                             )}
 
+                            {/* Behavior warning banner */}
+                            <AnimatePresence>
+                                {behaviorWarnings.length > 0 && (
+                                    <BehaviorWarningBanner warnings={behaviorWarnings} />
+                                )}
+                            </AnimatePresence>
+
+                            {/* Behavior status dot */}
+                            {behaviorSessionId && permissionsGranted && (
+                                <BehaviorStatusDot
+                                    faceCount={behaviorFaceCount}
+                                    isLookingAway={behaviorLookingAway}
+                                />
+                            )}
+
                             <div className="absolute bottom-4 left-4 flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse inline-block"></span>
+                                <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse inline-block" />
                                 <span className="text-white text-xs font-semibold uppercase tracking-widest">AI Interviewer Live</span>
                             </div>
                         </div>
@@ -648,7 +715,7 @@ export default function LiveInterviewPage() {
                             </div>
                         </div>
 
-                        {/* User Camera */}
+                        {/* User Camera preview placeholder */}
                         <div className="rounded-2xl p-5 text-white flex flex-col items-center gap-3"
                             style={{ background: "linear-gradient(135deg,#013066,#0058bd)" }}>
                             <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center overflow-hidden border-2 border-white/40">
