@@ -167,10 +167,12 @@ public class AiApiClient {
                 headers.setContentType(MediaType.APPLICATION_JSON);
                 headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
                 HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);
+                log.info("Calling AI API {} for {}. Payload keys={}", endpointUrl(endpoint), action, requestBody.keySet());
                 ResponseEntity<String> response = restTemplate.postForEntity(
                         endpointUrl(endpoint),
                         requestEntity,
                         String.class);
+                log.info("AI API {} for {} succeeded with status {}", endpoint, action, response.getStatusCode());
                 return response.getBody();
             } catch (HttpStatusCodeException e) {
                 String responseBody = e.getResponseBodyAsString();

@@ -458,20 +458,6 @@ export default function QuestionBankPage() {
                             </div>
 
                             <section>
-                                <h3 className="mb-2 font-bold text-gray-900">Suggested Answer</h3>
-                                <p className="whitespace-pre-line text-sm leading-6 text-gray-600">
-                                    {selectedQuestion.sampleAnswer || 'No sample answer has been added yet.'}
-                                </p>
-                            </section>
-
-                            <section>
-                                <h3 className="mb-2 font-bold text-gray-900">Explanation</h3>
-                                <p className="whitespace-pre-line text-sm leading-6 text-gray-600">
-                                    {selectedQuestion.explanation || 'No explanation has been added yet.'}
-                                </p>
-                            </section>
-
-                            <section>
                                 <h3 className="mb-2 flex items-center gap-2 font-bold text-gray-900"><FiTag /> Tags</h3>
                                 <div className="flex flex-wrap gap-2">
                                     {(selectedQuestion.tags || []).length > 0 ? selectedQuestion.tags.map(tag => (

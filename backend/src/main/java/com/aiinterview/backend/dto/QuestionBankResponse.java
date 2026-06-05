@@ -21,6 +21,9 @@ public class QuestionBankResponse {
     private String jobRoleName;
     private Integer topicId;
     private String topicName;
+    private UUID createdById;
+    private String createdByName;
+    private String createdByEmail;
     private String questionText;
     private String difficulty;
     private String role;

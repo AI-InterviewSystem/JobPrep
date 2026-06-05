@@ -216,9 +216,16 @@ export const interviewSessionApi = {
     list: (params) => api.get('/interview-sessions', { params }),
     start: (id, data) => api.post(`/interview-sessions/${id}/start`, data || {}),
     submitAnswer: (id, data) => api.post(`/interview-sessions/${id}/answers`, data),
-    uploadRecording: (id, data) => api.post(`/interview-sessions/${id}/recordings`, data, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-    }),
+    uploadRecording: (id, data) => {
+        const token = storage.getToken();
+        if (token && data instanceof FormData && !data.has('authToken')) {
+            data.append('authToken', token);
+        }
+        return api.post(`/interview-sessions/${id}/recordings`, data, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+            skipAuthRedirect: true
+        });
+    },
     complete: (id) => api.post(`/interview-sessions/${id}/complete`),
     delete: (id) => api.delete(`/interview-sessions/${id}`),
 };

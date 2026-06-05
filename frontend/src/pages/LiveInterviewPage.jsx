@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { interviewSessionApi, behaviorApi } from "../services/api"
 
-const DEFAULT_TOTAL_QUESTIONS = 5
+const DEFAULT_TOTAL_QUESTIONS = 10
 const INITIAL_QUESTION = 1
 const FRAME_INTERVAL_MS = 2000   // capture a webcam frame every 2 seconds
 
@@ -12,6 +12,7 @@ const aiMessage = `AI: "Thank you for that background. Now, regarding your exper
 // ─── Behavior warning overlay ────────────────────────────────────────────────
 function BehaviorWarningBanner({ warnings }) {
     if (!warnings || warnings.length === 0) return null
+    const latestWarning = formatBehaviorWarning(warnings[warnings.length - 1])
     return (
         <motion.div
             initial={{ opacity: 0, y: -8 }}
@@ -22,9 +23,18 @@ function BehaviorWarningBanner({ warnings }) {
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M5.07 19H19a2 2 0 001.73-3L13.73 4a2 2 0 00-3.46 0L3.27 16A2 2 0 005.07 19z" />
             </svg>
-            <span>{warnings[warnings.length - 1]}</span>
+            <span>{latestWarning}</span>
         </motion.div>
     )
+}
+
+function formatBehaviorWarning(warning) {
+    if (warning == null) return ""
+    if (typeof warning === "string") return warning
+    if (typeof warning === "object") {
+        return warning.message || warning.type || JSON.stringify(warning)
+    }
+    return String(warning)
 }
 
 // ─── Behavior status indicator ───────────────────────────────────────────────
@@ -180,7 +190,7 @@ export default function LiveInterviewPage() {
                     setBehaviorFaceCount(data.face_count ?? 1)
                     setBehaviorLookingAway(data.is_looking_away ?? false)
                     if (Array.isArray(data.warnings) && data.warnings.length > 0) {
-                        setBehaviorWarnings(data.warnings)
+                        setBehaviorWarnings(data.warnings.map(formatBehaviorWarning))
                     } else {
                         setBehaviorWarnings([])
                     }
@@ -323,7 +333,7 @@ export default function LiveInterviewPage() {
     }
 
     const currentQuestionText = session?.questions?.[questionNum - 1]?.questionText || "Waiting for the AI interviewer to generate the next question..."
-    const totalQuestions = DEFAULT_TOTAL_QUESTIONS
+    const totalQuestions = Math.max(1, Number(session?.totalQuestions) || DEFAULT_TOTAL_QUESTIONS)
     const progressPct = ((questionNum - 1) / totalQuestions) * 100
 
     const getSupportedRecordingMimeType = () => {
@@ -362,8 +372,10 @@ export default function LiveInterviewPage() {
 
     const uploadRecordingBlob = async (blob, questionId, answerId, durationSeconds, transcriptText) => {
         if (!blob || blob.size === 0) return null
-        const isVideo = (blob.type || "").startsWith("video/")
-        const file = new File([blob], `interview-answer-${questionId}.webm`, { type: blob.type || "video/webm" })
+        const rawType = blob.type || "video/webm"
+        const cleanType = rawType.split(";")[0] || "video/webm"
+        const isVideo = cleanType.startsWith("video/")
+        const file = new File([blob], `interview-answer-${questionId}.webm`, { type: cleanType })
         const formData = new FormData()
         formData.append("file", file)
         formData.append("questionId", questionId)
@@ -454,11 +466,14 @@ export default function LiveInterviewPage() {
         const latestSession = await interviewSessionApi.get(sessionId)
         const updatedSession = latestSession.data
         setSession(updatedSession)
-        const availableQuestions = updatedSession?.questions?.length || DEFAULT_TOTAL_QUESTIONS
+        const availableQuestions = updatedSession?.questions?.length || 0
+        const expectedQuestions = Math.max(1, Number(updatedSession?.totalQuestions) || totalQuestions)
         if (questionNum < availableQuestions) {
             transcriptRef.current = ""
             setQuestionNum((q) => q + 1)
             startQuestionCapture()
+        } else if (questionNum < expectedQuestions) {
+            setPermissionError("Waiting for the AI interviewer to generate the next question. Please try Next Question again in a moment.")
         } else {
             await completeInterviewSession()
         }
@@ -473,26 +488,48 @@ export default function LiveInterviewPage() {
 
     const startInterviewSession = async (id) => {
         try {
+            let setup = null
+            const stored = localStorage.getItem("interview_setup")
+            if (stored) {
+                try { setup = JSON.parse(stored) } catch { setup = null }
+            }
+            const desiredQuestions = Number(setup?.numQuestions) || DEFAULT_TOTAL_QUESTIONS
             const currentSessionRes = await interviewSessionApi.get(id)
-            if (
+            const currentTotalQuestions = Number(currentSessionRes.data?.totalQuestions) || 0
+            const canReuseSession =
                 currentSessionRes.data?.status === "IN_PROGRESS" &&
+                currentSessionRes.data?.aiStatus !== "DEGRADED" &&
+                currentTotalQuestions >= desiredQuestions &&
                 Array.isArray(currentSessionRes.data?.questions) &&
                 currentSessionRes.data.questions.length > 0
+            if (
+                canReuseSession
             ) {
                 setSession(currentSessionRes.data)
                 setSessionStarted(true)
                 setPermissionError("")
                 return
             }
-            let setup = null
-            const stored = localStorage.getItem("interview_setup")
-            if (stored) {
-                try { setup = JSON.parse(stored) } catch { setup = null }
+
+            let startSessionId = id
+            if (
+                currentSessionRes.data?.status === "IN_PROGRESS" &&
+                Array.isArray(currentSessionRes.data?.questions) &&
+                currentSessionRes.data.questions.length > 0
+            ) {
+                const createRes = await interviewSessionApi.create({
+                    jobDescriptionId: setup?.jdId || null,
+                    roleSnapshot: setup?.roleSnapshot || "",
+                    title: setup?.selectedLevel ? `${setup?.selectedType || "Technical"} ${setup.selectedLevel} Interview` : "Technical Interview",
+                })
+                startSessionId = createRes.data.id
+                setSessionId(startSessionId)
+                localStorage.setItem("interview_setup", JSON.stringify({ ...(setup || {}), sessionId: startSessionId, numQuestions: desiredQuestions }))
             }
-            const startRes = await interviewSessionApi.start(id, {
+            const startRes = await interviewSessionApi.start(startSessionId, {
                 interviewType: setup?.selectedType || "Technical",
                 interviewLevel: setup?.selectedLevel || "Junior",
-                numQuestions: 5,
+                numQuestions: desiredQuestions,
             })
             setSession(startRes.data)
             setSessionStarted(true)

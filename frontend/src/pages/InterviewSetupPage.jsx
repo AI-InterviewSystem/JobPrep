@@ -1,47 +1,9 @@
 import { Link, useNavigate } from "react-router-dom"
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { cvApi, interviewSessionApi, jobDescriptionApi, aiHelpersApi } from "../services/api"
+import { cvApi, interviewSessionApi, jobDescriptionApi, aiHelpersApi, experienceLevelsApi } from "../services/api"
 import logo from "../assets/images/jobprep-logo.png"
 
-
-
-const experienceLevels = [
-    { label: "Intern", desc: "Still in university or recent grad" },
-    { label: "Fresher", desc: "0-1 years of experience" },
-    { label: "Junior", desc: "1-3 years of experience" },
-    { label: "Mid", desc: "3-5+ years of experience" },
-]
-
-const interviewTypes = [
-    {
-        label: "HR Interview",
-        desc: "Culture fit & soft skills",
-        icon: (
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-        ),
-    },
-    {
-        label: "Technical",
-        desc: "Algorithms & domain knowledge",
-        icon: (
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-            </svg>
-        ),
-    },
-    {
-        label: "Behavioral",
-        desc: "STAR method scenarios",
-        icon: (
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a4 4 0 00-5-3.87M9 20H4v-2a4 4 0 015-3.87m6-4.13a4 4 0 11-8 0 4 4 0 018 0z" />
-            </svg>
-        ),
-    },
-]
 
 function inferRoleFromJobDescription(text) {
     if (!text?.trim()) return ""
@@ -55,8 +17,10 @@ function inferRoleFromJobDescription(text) {
 
 export default function InterviewSetupPage() {
     const navigate = useNavigate()
-    const [selectedLevel, setSelectedLevel] = useState("Intern")
-    const [selectedType, setSelectedType] = useState("Technical")
+    const [experienceLevels, setExperienceLevels] = useState([])
+    const [loadingLevels, setLoadingLevels] = useState(true)
+    const [selectedLevel, setSelectedLevel] = useState("")
+    const selectedType = "Technical"
 
     const [cvs, setCvs] = useState([])
     const [loadingCvs, setLoadingCvs] = useState(true)
@@ -79,7 +43,33 @@ export default function InterviewSetupPage() {
 
     useEffect(() => {
         fetchCvs()
+        fetchExperienceLevels()
     }, [])
+
+    const normalizeLevelCode = (value) => {
+        if (!value) return ""
+        const clean = String(value).trim()
+        const matched = experienceLevels.find(level =>
+            level.code?.toLowerCase() === clean.toLowerCase() ||
+            level.name?.toLowerCase() === clean.toLowerCase()
+        )
+        return matched?.code || clean
+    }
+
+    const fetchExperienceLevels = async () => {
+        try {
+            const res = await experienceLevelsApi.getActive()
+            const activeLevels = res.data || []
+            setExperienceLevels(activeLevels)
+            if (!selectedLevel && activeLevels.length > 0) {
+                setSelectedLevel(activeLevels[0].code)
+            }
+        } catch (err) {
+            console.error("Failed to fetch experience levels", err)
+        } finally {
+            setLoadingLevels(false)
+        }
+    }
 
 
     const handleAIAnalyze = async () => {
@@ -112,40 +102,22 @@ export default function InterviewSetupPage() {
 
             // Auto-select Level and Type based on JD analysis
             if (result.interview_level) {
-                setSelectedLevel(result.interview_level);
+                setSelectedLevel(normalizeLevelCode(result.interview_level));
                 setIsAutoSelected(true);
             } else {
                 // Fallback: Infer level from JD text
                 const lowerJd = jobDescription.toLowerCase();
                 if (lowerJd.includes("intern")) {
-                    setSelectedLevel("Intern");
+                    setSelectedLevel(normalizeLevelCode("Intern"));
                     setIsAutoSelected(true);
                 } else if (lowerJd.includes("mid")) {
-                    setSelectedLevel("Mid");
+                    setSelectedLevel(normalizeLevelCode("Mid"));
                     setIsAutoSelected(true);
                 } else if (lowerJd.includes("senior")) {
-                    setSelectedLevel("Senior");
+                    setSelectedLevel(normalizeLevelCode("Senior"));
                     setIsAutoSelected(true);
                 } else if (lowerJd.includes("junior") || lowerJd.includes("fresher")) {
-                    setSelectedLevel("Junior");
-                    setIsAutoSelected(true);
-                }
-            }
-
-            if (result.interview_type) {
-                setSelectedType(result.interview_type);
-                setIsAutoSelected(true);
-            } else {
-                // Fallback: Infer type from JD text
-                const lowerJd = jobDescription.toLowerCase();
-                if (lowerJd.includes("hr") || lowerJd.includes("human resource")) {
-                    setSelectedType("HR Interview");
-                    setIsAutoSelected(true);
-                } else if (lowerJd.includes("behavioral") || lowerJd.includes("soft skill")) {
-                    setSelectedType("Behavioral");
-                    setIsAutoSelected(true);
-                } else if (lowerJd.includes("technical") || lowerJd.includes("engineer") || lowerJd.includes("developer") || lowerJd.includes("coding")) {
-                    setSelectedType("Technical");
+                    setSelectedLevel(normalizeLevelCode("Junior"));
                     setIsAutoSelected(true);
                 }
             }
@@ -195,7 +167,7 @@ export default function InterviewSetupPage() {
             const startSessionRes = await interviewSessionApi.start(createSessionRes.data.id, {
                 interviewType: selectedType,
                 interviewLevel: selectedLevel,
-                numQuestions: 5,
+                numQuestions: 10,
             })
 
             const setupState = {
@@ -205,6 +177,7 @@ export default function InterviewSetupPage() {
                 selectedIndustry: "", // Reset industry since job selection is removed
                 selectedLevel,
                 selectedType,
+                numQuestions: 10,
                 keyRequirements,
                 jdId: finalJdId,
                 aiStarted: true
@@ -265,10 +238,7 @@ export default function InterviewSetupPage() {
                     const cvData = parsedRes.data.cvData;
                     if (cvData) {
                         if (cvData.interview_level) {
-                            setSelectedLevel(cvData.interview_level);
-                        }
-                        if (cvData.interview_type) {
-                            setSelectedType(cvData.interview_type);
+                            setSelectedLevel(normalizeLevelCode(cvData.interview_level));
                         }
                         setIsAutoSelected(true);
                     }
@@ -629,20 +599,22 @@ export default function InterviewSetupPage() {
                             <h2 className="font-bold text-gray-900 text-lg">Experience Level</h2>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            {experienceLevels.map(({ label, desc }, index) => (
+                            {loadingLevels ? (
+                                <div className="col-span-full rounded-xl border border-gray-100 bg-gray-50 p-4 text-sm text-gray-500">Loading levels...</div>
+                            ) : experienceLevels.map(({ id, code, name, description }, index) => (
                                 <motion.button
-                                    key={label}
+                                    key={id || code}
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ duration: 0.4, delay: index * 0.1 }}
                                     whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                                    onClick={() => setSelectedLevel(label)}
-                                    className={`relative text-left p-4 rounded-xl border-2 transition-all ${selectedLevel === label
+                                    onClick={() => setSelectedLevel(code)}
+                                    className={`relative text-left p-4 rounded-xl border-2 transition-all ${selectedLevel === code
                                         ? "border-primary bg-blue-50"
                                         : "border-gray-100 bg-gray-50 hover:border-primary/40"
                                         }`}
                                 >
-                                    {selectedLevel === label && (
+                                    {selectedLevel === code && (
                                         <motion.div
                                             initial={{ scale: 0 }}
                                             animate={{ scale: 1 }}
@@ -656,54 +628,8 @@ export default function InterviewSetupPage() {
                                             </svg>
                                         </motion.div>
                                     )}
-                                    <p className="font-bold text-gray-900 text-sm mb-1">{label}</p>
-                                    <p className="text-xs text-gray-400">{desc}</p>
-                                </motion.button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Interview Type */}
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                        <div className="flex items-center gap-2 mb-5">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                            </svg>
-                            <h2 className="font-bold text-gray-900 text-lg">Interview Type</h2>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            {interviewTypes.map(({ label, desc, icon }, index) => (
-                                <motion.button
-                                    key={label}
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ duration: 0.4, delay: 0.2 + index * 0.1 }}
-                                    whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                                    onClick={() => setSelectedType(label)}
-                                    className={`relative text-center p-6 rounded-xl border-2 transition-all flex flex-col items-center gap-3 ${selectedType === label
-                                        ? "border-primary bg-blue-50 text-primary"
-                                        : "border-gray-100 bg-gray-50 hover:border-primary/40 text-gray-500"
-                                        }`}
-                                >
-                                    {selectedType === label && (
-                                        <motion.div
-                                            initial={{ scale: 0 }}
-                                            animate={{ scale: 1 }}
-                                            className="absolute top-3 right-3 flex items-center gap-1.5"
-                                        >
-                                            {isAutoSelected && (
-                                                <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded-md uppercase tracking-wider">AI Pick</span>
-                                            )}
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-primary" viewBox="0 0 20 20" fill="currentColor">
-                                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                            </svg>
-                                        </motion.div>
-                                    )}
-                                    {icon}
-                                    <div>
-                                        <p className="font-bold text-gray-900 text-sm">{label}</p>
-                                        <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
-                                    </div>
+                                    <p className="font-bold text-gray-900 text-sm mb-1">{name || code}</p>
+                                    <p className="text-xs text-gray-400">{description || "Any matching experience range"}</p>
                                 </motion.button>
                             ))}
                         </div>

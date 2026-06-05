@@ -54,6 +54,19 @@ function RiskBadge({ riskLevel }) {
     )
 }
 
+function formatBehaviorWarning(warning) {
+    if (warning == null) return ""
+    if (typeof warning === "string") return warning
+    if (typeof warning === "object") {
+        const parts = [
+            warning.message || warning.type,
+            warning.elapsed_seconds != null ? `${Math.round(Number(warning.elapsed_seconds))}s` : null,
+        ].filter(Boolean)
+        return parts.length > 0 ? parts.join(" - ") : JSON.stringify(warning)
+    }
+    return String(warning)
+}
+
 export default function InterviewResultPage() {
     const navigate = useNavigate();
     const location = useLocation();
@@ -72,7 +85,9 @@ export default function InterviewResultPage() {
     // Behavior report data
     const hasBehavior = behaviorReport && typeof behaviorReport === "object"
     const bSummary = hasBehavior ? (behaviorReport.summary || {}) : {}
-    const bWarnings = hasBehavior ? (behaviorReport.warnings || []) : []
+    const bWarnings = hasBehavior && Array.isArray(behaviorReport.warnings)
+        ? behaviorReport.warnings.map(formatBehaviorWarning).filter(Boolean)
+        : []
 
     return (
         <div className="min-h-screen bg-gray-50 font-display flex flex-col">

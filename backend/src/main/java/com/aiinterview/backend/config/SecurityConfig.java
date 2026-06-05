@@ -55,13 +55,15 @@ public class SecurityConfig {
                         .requestMatchers("/files/upload").permitAll()
                         .requestMatchers("/pricing-plans/**").permitAll()
                         .requestMatchers("/payments/webhook").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/interview-sessions/*/recordings").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint((request, response, authException) -> {
                             response.setStatus(jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED);
-                            response.getWriter().write("Unauthorized");
+                            response.setContentType("application/json");
+                            response.getWriter().write("{\"message\":\"Unauthorized\"}");
                         })
                 )
                 .sessionManagement(session -> session

@@ -48,14 +48,15 @@ public class FileService {
         try {
             String extension = "";
             String originalFilename = file.getOriginalFilename();
+            String cleanContentType = sanitizeContentType(file.getContentType());
             if (originalFilename != null && originalFilename.contains(".")) {
                 extension = originalFilename.substring(originalFilename.lastIndexOf("."));
-            } else if ("video/webm".equalsIgnoreCase(file.getContentType()) || "audio/webm".equalsIgnoreCase(file.getContentType())) {
+            } else if ("video/webm".equalsIgnoreCase(cleanContentType) || "audio/webm".equalsIgnoreCase(cleanContentType)) {
                 extension = ".webm";
             }
 
             String filePath = sessionId + "/" + questionId + "/" + UUID.randomUUID() + extension;
-            String publicUrl = saveToBucket(file.getBytes(), filePath, file.getContentType(), recordingBucket);
+            String publicUrl = saveToBucket(file.getBytes(), filePath, cleanContentType, recordingBucket);
             return new StoredFile(recordingBucket, filePath, publicUrl);
         } catch (Exception e) {
             throw new RuntimeException("Could not store the recording. Error: " + e.getMessage(), e);
@@ -84,7 +85,7 @@ public class FileService {
             HttpHeaders headers = new HttpHeaders();
             headers.set("Authorization", "Bearer " + supabaseKey);
             headers.set("apikey", supabaseKey);
-            headers.setContentType(MediaType.parseMediaType(contentType != null ? contentType : "application/octet-stream"));
+            headers.setContentType(MediaType.parseMediaType(sanitizeContentType(contentType)));
 
             HttpEntity<byte[]> entity = new HttpEntity<>(fileBytes, headers);
 
@@ -103,6 +104,14 @@ public class FileService {
     }
 
     public record StoredFile(String bucketName, String filePath, String publicUrl) {
+    }
+
+    private String sanitizeContentType(String contentType) {
+        if (contentType == null || contentType.isBlank()) {
+            return "application/octet-stream";
+        }
+        String clean = contentType.split(";")[0].trim();
+        return clean.isBlank() ? "application/octet-stream" : clean;
     }
 
     public void delete(String storagePath) {
