@@ -5,6 +5,7 @@ import com.aiinterview.backend.entity.*;
 import com.aiinterview.backend.exception.AppException;
 import com.aiinterview.backend.repository.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,6 +15,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class InterviewRecordingService {
 
     private final InterviewSessionRepository sessionRepository;
@@ -39,6 +41,8 @@ public class InterviewRecordingService {
         InterviewSession session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new AppException("Session not found"));
         if (!session.getUser().getEmail().equals(userEmail)) {
+            log.warn("Recording upload unauthorized. sessionId={}, authUser={}, owner={}",
+                    sessionId, userEmail, session.getUser().getEmail());
             throw new AppException("Unauthorized");
         }
 
@@ -57,7 +61,8 @@ public class InterviewRecordingService {
             }
         }
 
-        String normalizedType = normalizeRecordingType(recordingType, file.getContentType());
+        String cleanMimeType = sanitizeContentType(file.getContentType());
+        String normalizedType = normalizeRecordingType(recordingType, cleanMimeType);
         FileService.StoredFile storedFile = fileService.saveInterviewRecording(file, sessionId, questionId);
 
         InterviewRecording recording = InterviewRecording.builder()
@@ -69,7 +74,7 @@ public class InterviewRecordingService {
                 .provider("supabase")
                 .bucketName(storedFile.bucketName())
                 .filePath(storedFile.filePath())
-                .mimeType(file.getContentType())
+                .mimeType(cleanMimeType)
                 .fileSize(file.getSize())
                 .durationSeconds(durationSeconds)
                 .transcriptText(transcriptText)
@@ -111,5 +116,13 @@ public class InterviewRecordingService {
             throw new AppException("Recording type must be audio or video");
         }
         return value;
+    }
+
+    private String sanitizeContentType(String contentType) {
+        if (contentType == null || contentType.isBlank()) {
+            return "application/octet-stream";
+        }
+        String clean = contentType.split(";")[0].trim();
+        return clean.isBlank() ? "application/octet-stream" : clean;
     }
 }

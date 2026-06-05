@@ -98,7 +98,8 @@ public class InterviewSessionService {
         String interviewLevel = mapInterviewLevel(startRequest != null ? startRequest.getInterviewLevel() : null);
         int numQuestions = startRequest != null && startRequest.getNumQuestions() != null
                 ? startRequest.getNumQuestions()
-                : 5;
+                : 10;
+        numQuestions = Math.max(1, Math.min(numQuestions, 10));
 
         try {
             Map<String, Object> req = new HashMap<>();
@@ -114,8 +115,8 @@ public class InterviewSessionService {
             req.put("passing_score", 0);
 
             log.info(
-                    "Starting AI interview session. sessionId={}, interviewType={}, interviewLevel={}, hasJobDescription={}",
-                    sessionId, interviewType, interviewLevel, session.getJobDescription() != null);
+                    "Starting AI interview session. sessionId={}, interviewType={}, interviewLevel={}, numQuestions={}, hasJobDescription={}",
+                    sessionId, interviewType, interviewLevel, numQuestions, session.getJobDescription() != null);
             String aiResponse = aiApiClient.startInterview(req);
 
             JsonNode resNode = objectMapper.readTree(aiResponse);
@@ -184,10 +185,14 @@ public class InterviewSessionService {
         if (level == null || level.isBlank()) {
             return "Mid";
         }
-        return switch (level.trim()) {
-            case "Intern" -> "Intern";
-            case "Fresher" -> "Junior";
-            case "Junior" -> "Mid";
+        String normalized = level.trim().replace("-", "_").replace(" ", "_").toUpperCase(Locale.ROOT);
+        return switch (normalized) {
+            case "INTERN" -> "Intern";
+            case "FRESHER" -> "Fresher";
+            case "JUNIOR" -> "Junior";
+            case "MIDDLE" -> "Middle";
+            case "MID" -> "Mid";
+            case "SENIOR" -> "Senior";
             default -> level.trim();
         };
     }
@@ -198,6 +203,10 @@ public class InterviewSessionService {
 
         InterviewQuestion question = questionRepository.findById(request.getQuestionId())
                 .orElseThrow(() -> new AppException("Question not found"));
+        if (session.getAiSessionId() == null || question.getQuestionSource() == QuestionSource.PRE_DEFINED) {
+            throw new AppException(
+                    "This interview session is in degraded mode and cannot continue with the AI interviewer. Please start a new interview session.");
+        }
 
         answerRepository.findFirstByQuestionId(question.getId()).ifPresent(answerRepository::delete);
 
@@ -248,23 +257,21 @@ public class InterviewSessionService {
             return SubmitAnswerResponse.builder().answerId(savedAnswer.getId()).build();
         } catch (AiApiClient.AiProviderRateLimitException e) {
             log.warn(
-                    "AI provider rate-limited while submitting answer for session {}. Saving answer and continuing with a predefined question.",
+                    "AI provider rate-limited while submitting answer for session {}. Saving answer without generating a fallback question.",
                     sessionId);
             answer.setFeedback(
                     "AI evaluation is temporarily unavailable because the AI provider is rate-limited. This answer was saved and can be reviewed later.");
             InterviewAnswer savedAnswer = answerRepository.save(answer);
             updateQuestionProgress(session);
-            createFallbackQuestionIfNeeded(session, question, "AI provider rate-limited");
             return SubmitAnswerResponse.builder().answerId(savedAnswer.getId()).build();
         } catch (AiApiClient.AiProviderInvalidResponseException e) {
             log.warn(
-                    "AI provider returned invalid answer response for session {}. Saving answer and continuing with a predefined question.",
+                    "AI provider returned invalid answer response for session {}. Saving answer without generating a fallback question.",
                     sessionId);
             answer.setFeedback(
                     "AI evaluation is temporarily unavailable because the AI service returned an invalid response. This answer was saved and can be reviewed later.");
             InterviewAnswer savedAnswer = answerRepository.save(answer);
             updateQuestionProgress(session);
-            createFallbackQuestionIfNeeded(session, question, "AI response invalid");
             return SubmitAnswerResponse.builder().answerId(savedAnswer.getId()).build();
         } catch (Exception e) {
             log.error("AI API Error", e);
@@ -446,39 +453,6 @@ public class InterviewSessionService {
                 .orderIndex(orderIndex)
                 .build();
         questionRepository.save(q);
-    }
-
-    private void createFallbackQuestionIfNeeded(InterviewSession session, InterviewQuestion answeredQuestion,
-            String reason) {
-        int currentIndex = answeredQuestion.getOrderIndex() != null ? answeredQuestion.getOrderIndex() : 1;
-        if (currentIndex >= 5) {
-            return;
-        }
-
-        int nextIndex = currentIndex + 1;
-        String questionText = fallbackQuestionText(nextIndex);
-        InterviewQuestion q = InterviewQuestion.builder()
-                .session(session)
-                .questionText(questionText)
-                .aiQuestionId("degraded-fallback-q" + nextIndex)
-                .questionSource(QuestionSource.PRE_DEFINED)
-                .jobRequirementTag(reason)
-                .orderIndex(nextIndex)
-                .build();
-        questionRepository.save(q);
-    }
-
-    private String fallbackQuestionText(int orderIndex) {
-        return switch (orderIndex) {
-            case 2 ->
-                "Describe a project or responsibility from your CV that best matches this role. What was your specific contribution?";
-            case 3 ->
-                "Tell me about a difficult technical or workplace problem you handled. How did you approach it and what was the result?";
-            case 4 ->
-                "Which skill from your CV would you most want to demonstrate in this position, and how have you applied it in practice?";
-            case 5 -> "What would you improve in your previous work if you had more time or resources, and why?";
-            default -> "Tell me about your background and how it relates to this role.";
-        };
     }
 
     private InterviewSessionResponse completeWithPartialSummary(InterviewSession session, UUID sessionId,

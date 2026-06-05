@@ -158,6 +158,7 @@ public class QuestionBankService {
     public QuestionBankResponse createQuestion(QuestionBankRequest request) {
         QuestionBank question = QuestionBank.builder().build();
         applyRequest(question, request);
+        question.setCreatedBy(getCurrentUser());
         return mapQuestion(questionBankRepository.save(question), false, false);
     }
 
@@ -274,6 +275,7 @@ public class QuestionBankService {
         JobGroup group = category != null ? category.getJobGroup() : null;
         JobRole jobRole = question.getJobRole();
         QuestionTopic topic = question.getTopic();
+        User createdBy = question.getCreatedBy();
         String displayRole = question.getRole() != null ? question.getRole() : (jobRole != null ? jobRole.getName() : null);
         String displayLevel = question.getLevel() != null ? question.getLevel() : question.getDifficulty();
         return QuestionBankResponse.builder()
@@ -286,6 +288,9 @@ public class QuestionBankService {
                 .jobRoleName(jobRole != null ? jobRole.getName() : null)
                 .topicId(topic != null ? topic.getId() : null)
                 .topicName(topic != null ? topic.getName() : null)
+                .createdById(createdBy != null ? createdBy.getId() : null)
+                .createdByName(createdBy != null && createdBy.getProfile() != null ? createdBy.getProfile().getFullName() : null)
+                .createdByEmail(createdBy != null ? createdBy.getEmail() : null)
                 .questionText(question.getQuestionText())
                 .difficulty(question.getDifficulty())
                 .role(displayRole)

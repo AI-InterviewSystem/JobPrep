@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { adminExperienceLevelsApi, adminJobsApi, adminQuestionBankApi } from '../services/api';
+import { adminExperienceLevelsApi, adminJobsApi, adminQuestionBankApi, questionBankApi } from '../services/api';
 import { storage } from '../services/storage';
 import { FiEdit2, FiFileText, FiPlus, FiRefreshCw, FiTrash2, FiUpload, FiX } from 'react-icons/fi';
 import toast from 'react-hot-toast';
@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 const initialForm = {
     jobCategoryId: '',
     jobRoleId: '',
+    topicId: '',
     questionText: '',
     difficulty: '',
     questionType: 'Technical',
@@ -19,6 +20,7 @@ export default function AdminQuestionBankPage() {
     const [questions, setQuestions] = useState([]);
     const [categories, setCategories] = useState([]);
     const [roles, setRoles] = useState([]);
+    const [topics, setTopics] = useState([]);
     const [levels, setLevels] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filters, setFilters] = useState({ categoryId: '', roleId: '', difficulty: '', questionType: '', isActive: '' });
@@ -44,14 +46,16 @@ export default function AdminQuestionBankPage() {
 
     const fetchBootstrap = async () => {
         try {
-            const [categoryRes, roleRes, levelRes] = await Promise.all([
+            const [categoryRes, roleRes, levelRes, topicRes] = await Promise.all([
                 adminJobsApi.getCategories(),
                 adminJobsApi.getRoles(),
-                adminExperienceLevelsApi.getAll()
+                adminExperienceLevelsApi.getAll(),
+                questionBankApi.getTopics()
             ]);
             setCategories(categoryRes.data);
             setRoles(roleRes.data);
             setLevels(levelRes.data);
+            setTopics(topicRes.data);
         } catch (error) {
             toast.error('Failed to load selectors');
             console.error(error);
@@ -77,6 +81,7 @@ export default function AdminQuestionBankPage() {
         setFormData(question ? {
             jobCategoryId: question.jobCategoryId || '',
             jobRoleId: question.jobRoleId || '',
+            topicId: question.topicId || '',
             questionText: question.questionText || '',
             difficulty: question.difficulty || '',
             questionType: question.questionType || 'Technical',
@@ -102,6 +107,7 @@ export default function AdminQuestionBankPage() {
                 ...formData,
                 jobCategoryId: formData.jobCategoryId || null,
                 jobRoleId: formData.jobRoleId || null,
+                topicId: formData.topicId ? Number(formData.topicId) : null,
                 suggestedDuration: Number(formData.suggestedDuration) || 120,
                 tags: formData.tags.split(',').map(tag => tag.trim()).filter(Boolean)
             };
@@ -220,12 +226,13 @@ export default function AdminQuestionBankPage() {
             <div className="overflow-x-auto">
                 <table className="w-full table-fixed text-left">
                     <colgroup>
-                        <col className="w-[36%]" />
-                        <col className="w-[25%]" />
+                        <col className="w-[30%]" />
+                        <col className="w-[22%]" />
                         <col className="w-[7%]" />
                         <col className="w-[7%]" />
                         <col className="w-[8%]" />
-                        <col className="w-[9%]" />
+                        <col className="w-[10%]" />
+                        <col className="w-[8%]" />
                         <col className="w-[8%]" />
                     </colgroup>
                     <thead>
@@ -235,13 +242,14 @@ export default function AdminQuestionBankPage() {
                             <th className="pb-4 pr-3">Level</th>
                             <th className="pb-4 pr-3">Type</th>
                             <th className="pb-4 pr-3">Duration</th>
+                            <th className="pb-4 pr-3">Created By</th>
                             <th className="pb-4 pr-3">Status</th>
                             <th className="pb-4 pr-4 text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                         {loading ? (
-                            <tr><td colSpan="7" className="py-10 text-center text-gray-500">Loading questions...</td></tr>
+                            <tr><td colSpan="8" className="py-10 text-center text-gray-500">Loading questions...</td></tr>
                         ) : questions.map(question => (
                             <tr key={question.id} className="hover:bg-slate-50 transition-colors">
                                 <td className="py-4 pl-4 pr-4 align-top">
@@ -258,10 +266,12 @@ export default function AdminQuestionBankPage() {
                                 <td className="py-4 pr-4 align-top text-sm text-gray-600">
                                     <p className="font-medium text-gray-800 truncate">{question.jobCategoryName || 'Unassigned'}</p>
                                     <p className="text-xs text-gray-400 truncate">{question.jobRoleName || question.jobGroupName || ''}</p>
+                                    <p className="text-xs text-gray-400 truncate">{question.topicName || 'No topic'}</p>
                                 </td>
                                 <td className="py-4 pr-3 align-top text-gray-600 truncate">{question.difficulty || '-'}</td>
                                 <td className="py-4 pr-3 align-top text-gray-600 truncate">{question.questionType || '-'}</td>
                                 <td className="py-4 pr-3 align-top text-gray-600 whitespace-nowrap">{question.suggestedDuration || 120}s</td>
+                                <td className="py-4 pr-3 align-top text-gray-600 truncate">{question.createdByName || question.createdByEmail || '-'}</td>
                                 <td className="py-4 pr-3 align-top">
                                     <button onClick={() => toggleActive(question)} className={`px-3 py-1 rounded-full text-xs font-medium ${question.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                                         {question.isActive ? 'Active' : 'Inactive'}
@@ -276,7 +286,7 @@ export default function AdminQuestionBankPage() {
                             </tr>
                         ))}
                         {!loading && questions.length === 0 && (
-                            <tr><td colSpan="7" className="py-10 text-center text-gray-500">No questions found.</td></tr>
+                            <tr><td colSpan="8" className="py-10 text-center text-gray-500">No questions found.</td></tr>
                         )}
                     </tbody>
                 </table>
@@ -309,6 +319,13 @@ export default function AdminQuestionBankPage() {
                                         {filteredRoles.map(role => <option key={role.id} value={role.id}>{role.name}</option>)}
                                     </select>
                                 </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Topic</label>
+                                <select value={formData.topicId} onChange={(e) => setFormData(prev => ({ ...prev, topicId: e.target.value }))} className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none">
+                                    <option value="">No topic</option>
+                                    {topics.map(topic => <option key={topic.id} value={topic.id}>{topic.name}</option>)}
+                                </select>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>

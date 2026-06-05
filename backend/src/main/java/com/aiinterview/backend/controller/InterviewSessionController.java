@@ -8,6 +8,8 @@ import com.aiinterview.backend.dto.SubmitAnswerRequest;
 import com.aiinterview.backend.dto.SubmitAnswerResponse;
 import com.aiinterview.backend.service.InterviewRecordingService;
 import com.aiinterview.backend.service.InterviewSessionService;
+import com.aiinterview.backend.service.JwtService;
+import com.aiinterview.backend.exception.AppException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +30,7 @@ public class InterviewSessionController {
 
     private final InterviewSessionService interviewSessionService;
     private final InterviewRecordingService interviewRecordingService;
+    private final JwtService jwtService;
 
     @PostMapping
     public ResponseEntity<InterviewSessionResponse> createSession(
@@ -98,10 +101,12 @@ public class InterviewSessionController {
             @RequestParam(required = false, defaultValue = "video") String recordingType,
             @RequestParam(required = false) Integer durationSeconds,
             @RequestParam(required = false) String transcriptText,
+            @RequestParam(required = false) String authToken,
             @RequestParam("file") MultipartFile file) {
+        String userEmail = resolveUserEmail(auth, authToken);
         return ResponseEntity.ok(interviewRecordingService.uploadRecording(
                 id,
-                auth.getName(),
+                userEmail,
                 questionId,
                 answerId,
                 recordingType,
@@ -109,6 +114,20 @@ public class InterviewSessionController {
                 transcriptText,
                 file
         ));
+    }
+
+    private String resolveUserEmail(Authentication auth, String authToken) {
+        if (auth != null && auth.isAuthenticated() && auth.getName() != null) {
+            return auth.getName();
+        }
+        if (authToken == null || authToken.isBlank()) {
+            throw new AppException("Authentication required");
+        }
+        try {
+            return jwtService.extractUsername(authToken.trim());
+        } catch (Exception e) {
+            throw new AppException("Invalid or expired authentication token");
+        }
     }
 
     @PostMapping("/{id}/complete")
