@@ -1,5 +1,7 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion"
+import { useRef, useState } from "react";
+import html2pdf from "html2pdf.js";
 import logo from "../assets/images/jobprep-logo.png"
 
 // Simple circular progress SVG
@@ -70,6 +72,32 @@ function formatBehaviorWarning(warning) {
 export default function InterviewResultPage() {
     const navigate = useNavigate();
     const location = useLocation();
+
+    const reportRef = useRef(null);
+    const [isDownloading, setIsDownloading] = useState(false);
+
+    const handleDownloadPdf = async () => {
+        const element = reportRef.current;
+        if (!element) return;
+
+        setIsDownloading(true);
+        const opt = {
+            margin: [0.5, 0.3, 0.5, 0.3], // top, right, bottom, left
+            filename: 'JobPrep_Interview_Report.pdf',
+            pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true },
+            jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+        };
+
+        try {
+            await html2pdf().set(opt).from(element).save();
+        } catch (error) {
+            console.error("Error generating PDF:", error);
+        } finally {
+            setIsDownloading(false);
+        }
+    };
     const session = location.state?.session || {};
     const behaviorReport = location.state?.behaviorReport || null;
 
@@ -91,7 +119,7 @@ export default function InterviewResultPage() {
 
     return (
         <div className="min-h-screen bg-gray-50 font-display flex flex-col">
-            <main className="max-w-6xl mx-auto w-full px-6 py-10 flex-1">
+            <main ref={reportRef} className="max-w-6xl mx-auto w-full px-6 py-10 flex-1 bg-gray-50">
                 {/* Page Title */}
                 <div className="mb-8 animate-entry flex flex-col md:flex-row md:items-end justify-between gap-4">
                     <div>
@@ -369,18 +397,34 @@ export default function InterviewResultPage() {
                 )}
 
                 {/* Actions */}
-                <div className="flex items-center justify-center gap-4 flex-wrap pb-8">
+                <div data-html2canvas-ignore="true" className="flex items-center justify-center gap-4 flex-wrap pb-8">
                     <button
                         onClick={() => navigate("/interview-setup")}
                         className="border-2 border-gray-800 text-gray-800 font-bold px-8 py-3 rounded-xl hover:bg-gray-100 transition-all"
                     >
                         Retake Simulation
                     </button>
-                    <button className="flex items-center gap-2 bg-primary text-white font-bold px-8 py-3 rounded-xl hover:bg-primary-dark transition-all">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                        Download Full Report (PDF)
+                    <button
+                        onClick={handleDownloadPdf}
+                        disabled={isDownloading}
+                        className={`flex items-center gap-2 text-white font-bold px-8 py-3 rounded-xl transition-all ${isDownloading ? 'bg-gray-400 cursor-not-allowed' : 'bg-primary hover:bg-primary-dark'}`}
+                    >
+                        {isDownloading ? (
+                            <>
+                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Generating PDF...
+                            </>
+                        ) : (
+                            <>
+                                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                </svg>
+                                Download Full Report (PDF)
+                            </>
+                        )}
                     </button>
                 </div>
             </main>
