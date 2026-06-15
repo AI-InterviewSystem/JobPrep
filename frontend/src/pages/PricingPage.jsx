@@ -176,12 +176,14 @@ export default function PricingPage() {
                             </button>
                             <ul className="space-y-3">
                                 {plan.features.map((f, i) => (
-                                    <li key={i} className={`flex items-center gap-2 text-sm ${f.included ? "text-gray-700" : "text-gray-300 line-through"}`}>
-                                        {f.included
-                                            ? <CheckIcon />
-                                            : <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-200" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
-                                        }
-                                        {f.text}
+                                    <li key={i} className={`flex items-start gap-2 text-sm ${f.included ? "text-gray-700" : "text-gray-300 line-through"}`}>
+                                        <div className="shrink-0 mt-0.5">
+                                            {f.included
+                                                ? <CheckIcon />
+                                                : <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-200" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                                            }
+                                        </div>
+                                        <span>{f.text}</span>
                                     </li>
                                 ))}
                             </ul>
@@ -230,16 +232,7 @@ export default function PricingPage() {
                     </div>
                 </div>
 
-                {/* Enterprise CTA */}
-                <div className="bg-blue-50 border border-blue-100 rounded-2xl px-8 py-8 flex flex-col md:flex-row items-center justify-between gap-6">
-                    <div>
-                        <h3 className="font-bold text-gray-900 text-xl mb-2">Need a custom plan for your school or team?</h3>
-                        <p className="text-gray-500 text-sm">We offer specialized enterprise and educational volume pricing for organizations looking to help their members succeed.</p>
-                    </div>
-                    <Link to="/signup" className="shrink-0 bg-primary text-white px-6 py-3 rounded-xl font-semibold text-sm hover:bg-primary-dark transition-all whitespace-nowrap">
-                        Contact Enterprise Sales
-                    </Link>
-                </div>
+
             </main>
 
         </div>
