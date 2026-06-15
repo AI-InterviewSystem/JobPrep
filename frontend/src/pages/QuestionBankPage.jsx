@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { FiBookmark, FiBookOpen, FiChevronRight, FiMic, FiPlay, FiRefreshCw, FiSend, FiSearch, FiTag, FiX } from 'react-icons/fi';
 import toast from 'react-hot-toast';
-import { experienceLevelsApi, questionBankApi } from '../services/api';
+import { experienceLevelsApi, questionBankApi, paymentApi } from '../services/api';
 
 const typeOptions = [
     { value: '', label: 'All types' },
@@ -34,6 +34,9 @@ export default function QuestionBankPage() {
         questionType: '',
         keyword: '',
     });
+
+    const [subscription, setSubscription] = useState(null);
+    const [practiceLimitReached, setPracticeLimitReached] = useState(false);
 
     useEffect(() => {
         fetchBootstrap();
@@ -72,14 +75,21 @@ export default function QuestionBankPage() {
 
     const fetchBootstrap = async () => {
         try {
-            const [topicRes, levelRes] = await Promise.all([
+            const [topicRes, levelRes, subRes] = await Promise.all([
                 questionBankApi.getTopics(),
                 experienceLevelsApi.getActive(),
+                paymentApi.getCurrentSubscription(),
             ]);
             setTopics(topicRes.data);
             setLevels(levelRes.data);
+
+            const sub = subRes.data;
+            setSubscription(sub);
+            if (sub && sub.practiceQuestionsLimit !== -1 && sub.practiceQuestionsUsed >= sub.practiceQuestionsLimit) {
+                setPracticeLimitReached(true);
+            }
         } catch (error) {
-            toast.error('Failed to load question bank filters');
+            toast.error('Failed to load question bank');
             console.error(error);
         }
     };
@@ -207,6 +217,7 @@ export default function QuestionBankPage() {
             toast.error('Select a question first');
             return;
         }
+
         try {
             setPracticeLoading(true);
             let session = practiceSession;
@@ -229,6 +240,16 @@ export default function QuestionBankPage() {
             setQuestions(prev => prev.map(question => question.id === selectedQuestion.id ? { ...question, practiced: true } : question));
             setSelectedQuestion(prev => prev ? { ...prev, practiced: true } : prev);
             toast.success('Answer submitted');
+
+            // Refresh subscription usage after submit
+            try {
+                const subRes = await paymentApi.getCurrentSubscription();
+                const sub = subRes.data;
+                setSubscription(sub);
+                if (sub && sub.practiceQuestionsLimit !== -1 && sub.practiceQuestionsUsed >= sub.practiceQuestionsLimit) {
+                    setPracticeLimitReached(true);
+                }
+            } catch (_) {}
         } catch (error) {
             toast.error(error?.response?.data?.message || 'Failed to submit answer');
             console.error(error);
@@ -397,6 +418,14 @@ export default function QuestionBankPage() {
                                         <FiPlay /> Start
                                     </button>
                                 </div>
+
+                                {practiceLimitReached && (
+                                    <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+                                        You have reached your limit of 10 free questions for this month.{' '}
+                                        <Link to="/pricing" className="underline font-bold">Upgrade</Link> to continue practicing.
+                                    </div>
+                                )}
+
                                 <textarea
                                     value={practiceAnswer}
                                     onChange={(e) => setPracticeAnswer(e.target.value)}

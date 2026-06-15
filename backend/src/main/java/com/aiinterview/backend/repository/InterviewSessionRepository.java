@@ -21,6 +21,8 @@ public interface InterviewSessionRepository extends JpaRepository<InterviewSessi
 
     long countByUserIdAndRetryOfSessionIdIsNotNullAndDeletedAtIsNull(UUID userId);
 
+    long countByUserIdAndCreatedAtGreaterThanEqualAndDeletedAtIsNull(UUID userId, java.time.LocalDateTime startDate);
+
     @Query(value = """
             SELECT DISTINCT s.*
             FROM interview_sessions s

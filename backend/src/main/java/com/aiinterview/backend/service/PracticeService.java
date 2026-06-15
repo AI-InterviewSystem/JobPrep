@@ -34,10 +34,14 @@ public class PracticeService {
     private final AiApiClient aiApiClient;
     private final ObjectMapper objectMapper;
     private final JdbcTemplate jdbcTemplate;
+    private final SubscriptionLimitService subscriptionLimitService;
 
     @Transactional
     public PracticeSessionResponse startSession(StartPracticeSessionRequest request) {
         User user = getCurrentUser();
+        
+        subscriptionLimitService.checkPracticeQuestionLimit(user);
+        
         QuestionTopic topic = request.getTopicId() != null
                 ? questionTopicRepository.findById(request.getTopicId())
                         .orElseThrow(() -> new AppException("Topic not found"))
@@ -94,6 +98,8 @@ public class PracticeService {
         if (request.getAnswerText() == null || request.getAnswerText().trim().isBlank()) {
             throw new AppException("Answer text is required");
         }
+        
+        subscriptionLimitService.checkPracticeQuestionLimit(user);
 
         PracticeAnswer answer = PracticeAnswer.builder()
                 .practiceSession(session)

@@ -36,11 +36,15 @@ public class InterviewSessionService {
     private final InterviewRecordingService interviewRecordingService;
     private final ObjectMapper objectMapper;
     private final UserLearningStatsService userLearningStatsService;
+    private final SubscriptionLimitService subscriptionLimitService;
 
     @Transactional
     public InterviewSessionResponse createSession(String userEmail, CreateInterviewSessionRequest request) {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new AppException("User not found"));
+        
+        subscriptionLimitService.checkMockInterviewLimit(user);
+        
         UUID jobDescriptionId = request != null ? request.getJobDescriptionId() : null;
 
         InterviewSession session = InterviewSession.builder()
@@ -82,6 +86,9 @@ public class InterviewSessionService {
             StartInterviewSessionRequest startRequest) {
         InterviewSession session = findSession(sessionId, userEmail);
         User user = session.getUser();
+        
+        subscriptionLimitService.checkMockInterviewLimit(user);
+        
         List<InterviewQuestion> existingQuestions = questionRepository.findBySessionIdOrderByOrderIndexAsc(sessionId);
         if (session.getStatus() == InterviewStatus.IN_PROGRESS && session.getAiSessionId() != null
                 && !existingQuestions.isEmpty()) {
@@ -161,6 +168,9 @@ public class InterviewSessionService {
             if (questions.isEmpty()) {
                 throw new AppException("AI did not return the first interview question.");
             }
+            
+            subscriptionLimitService.decrementMockInterview(user);
+            
             return buildResponse(saved, questions);
         } catch (AppException e) {
             throw e;

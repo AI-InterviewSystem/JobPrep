@@ -16,5 +16,11 @@ public class SubscriptionStatusResponse {
     private String status;
     private LocalDateTime currentPeriodEnd;
     private Boolean cancelAtPeriodEnd;
-    private Integer remainingInterviews;
+    private Integer remainingInterviews; // Remaining for current cycle or total limits
+    
+    // Usage info
+    private Integer mockInterviewsLimit; // Limit per month or per cycle (e.g., 2, 5, or -1)
+    private Integer mockInterviewsUsed;
+    private Integer practiceQuestionsLimit; // Limit per month (e.g., 10 or -1)
+    private Integer practiceQuestionsUsed;
 }

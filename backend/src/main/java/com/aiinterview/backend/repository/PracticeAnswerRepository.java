@@ -13,4 +13,5 @@ public interface PracticeAnswerRepository extends JpaRepository<PracticeAnswer, 
     boolean existsByPracticeSessionIdAndQuestionId(UUID practiceSessionId, Integer questionId);
     boolean existsByPracticeSessionUserIdAndQuestionId(UUID userId, Integer questionId);
     List<PracticeAnswer> findAllByPracticeSessionUserIdAndQuestionIdIn(UUID userId, List<Integer> questionIds);
+    long countByPracticeSessionUserIdAndAnsweredAtGreaterThanEqual(UUID userId, java.time.LocalDateTime startDate);
 }
