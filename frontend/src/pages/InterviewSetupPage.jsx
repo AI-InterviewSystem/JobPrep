@@ -2,7 +2,6 @@ import { Link, useNavigate } from "react-router-dom"
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { cvApi, interviewSessionApi, jobDescriptionApi, aiHelpersApi, experienceLevelsApi } from "../services/api"
-import logo from "../assets/images/jobprep-logo.png"
 
 
 function inferRoleFromJobDescription(text) {
@@ -638,12 +637,6 @@ export default function InterviewSetupPage() {
 
                 {/* Footer Action */}
                 <div className="mt-10 flex flex-col items-center gap-4">
-                    <div className="flex items-center gap-2 text-sm text-gray-500">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Estimated duration: 30-45 minutes
-                    </div>
                     {startError && (
                         <div className="w-full rounded-2xl bg-red-50 border border-red-100 text-red-700 px-4 py-3 text-sm text-center mb-3">
                             {startError}
