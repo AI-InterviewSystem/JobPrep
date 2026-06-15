@@ -18,6 +18,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.UUID;
@@ -37,6 +38,8 @@ public class PaymentService {
     private final PromoCodeUsageRepository promoCodeUsageRepository;
     private final PromoCodeService promoCodeService;
     private final ObjectMapper objectMapper;
+    private final InterviewSessionRepository interviewSessionRepository;
+    private final PracticeAnswerRepository practiceAnswerRepository;
 
     @Value("${app.frontend.url}")
     private String frontendUrl;
@@ -333,18 +336,52 @@ public class PaymentService {
     @Transactional(readOnly = true)
     public SubscriptionStatusResponse getCurrentSubscription() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new AppException("User not found"));
         LocalDateTime now = LocalDateTime.now();
-        return subscriptionRepository.findFirstByUserEmailAndStatusInOrderByCreatedAtDesc(
+        LocalDateTime startOfMonth = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+
+        UserSubscription activeSub = subscriptionRepository.findFirstByUserEmailAndStatusInOrderByCreatedAtDesc(
                 email, List.of(UserSubscription.Status.ACTIVE, UserSubscription.Status.ACTIVE_NON_RENEWING))
                 .filter(sub -> sub.getCurrentPeriodEnd() == null || sub.getCurrentPeriodEnd().isAfter(now))
-                .map(sub -> SubscriptionStatusResponse.builder()
-                        .planName(sub.getPlan().getName())
-                        .status(sub.getStatus().name())
-                        .currentPeriodEnd(sub.getCurrentPeriodEnd())
-                        .cancelAtPeriodEnd(sub.getCancelAtPeriodEnd())
-                        .remainingInterviews(sub.getRemainingInterviews())
-                        .build())
                 .orElse(null);
+
+        if (activeSub != null) {
+            Integer interviewsLimit = -1; // Default to unlimited unless features specify otherwise
+            try {
+                JsonNode features = objectMapper.readTree(activeSub.getPlan().getFeatures());
+                if (features.has("interviews")) {
+                    interviewsLimit = features.get("interviews").asInt();
+                }
+            } catch (Exception ignored) { }
+
+            return SubscriptionStatusResponse.builder()
+                    .planName(activeSub.getPlan().getName())
+                    .status(activeSub.getStatus().name())
+                    .currentPeriodEnd(activeSub.getCurrentPeriodEnd())
+                    .cancelAtPeriodEnd(activeSub.getCancelAtPeriodEnd())
+                    .remainingInterviews(activeSub.getRemainingInterviews())
+                    .mockInterviewsLimit(interviewsLimit)
+                    .mockInterviewsUsed(interviewsLimit == -1 ? 0 : (interviewsLimit - (activeSub.getRemainingInterviews() != null ? activeSub.getRemainingInterviews() : 0)))
+                    .practiceQuestionsLimit(-1) // Unlimited for paid plans
+                    .practiceQuestionsUsed((int) practiceAnswerRepository.countByPracticeSessionUserIdAndAnsweredAtGreaterThanEqual(user.getId(), startOfMonth))
+                    .build();
+        } else {
+            // Free plan
+            long mockUsed = interviewSessionRepository.countByUserIdAndCreatedAtGreaterThanEqualAndDeletedAtIsNull(user.getId(), startOfMonth);
+            long practiceUsed = practiceAnswerRepository.countByPracticeSessionUserIdAndAnsweredAtGreaterThanEqual(user.getId(), startOfMonth);
+
+            return SubscriptionStatusResponse.builder()
+                    .planName("Free Plan")
+                    .status("ACTIVE")
+                    .currentPeriodEnd(null)
+                    .cancelAtPeriodEnd(false)
+                    .remainingInterviews((int) Math.max(0, 2 - mockUsed))
+                    .mockInterviewsLimit(2)
+                    .mockInterviewsUsed((int) mockUsed)
+                    .practiceQuestionsLimit(10)
+                    .practiceQuestionsUsed((int) practiceUsed)
+                    .build();
+        }
     }
 
     @Transactional

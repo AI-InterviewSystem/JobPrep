@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "react-router-dom"
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { cvApi, interviewSessionApi, jobDescriptionApi, aiHelpersApi, experienceLevelsApi } from "../services/api"
+import { cvApi, interviewSessionApi, jobDescriptionApi, aiHelpersApi, experienceLevelsApi, paymentApi } from "../services/api"
 
 
 function inferRoleFromJobDescription(text) {
@@ -40,10 +40,29 @@ export default function InterviewSetupPage() {
     const [isStartingInterview, setIsStartingInterview] = useState(false)
     const [startError, setStartError] = useState("")
 
+    const [subscription, setSubscription] = useState(null)
+    const [limitReached, setLimitReached] = useState(false)
+
     useEffect(() => {
         fetchCvs()
         fetchExperienceLevels()
+        fetchSubscription()
     }, [])
+
+    const fetchSubscription = async () => {
+        try {
+            const res = await paymentApi.getCurrentSubscription()
+            const sub = res.data
+            setSubscription(sub)
+            if (sub) {
+                if (sub.mockInterviewsLimit !== -1 && sub.mockInterviewsUsed >= sub.mockInterviewsLimit) {
+                    setLimitReached(true)
+                }
+            }
+        } catch (err) {
+            console.error("Failed to fetch subscription", err)
+        }
+    }
 
     const normalizeLevelCode = (value) => {
         if (!value) return ""
@@ -644,15 +663,27 @@ export default function InterviewSetupPage() {
                     )}
                     <button
                         onClick={handleStartInterview}
-                        disabled={isStartingInterview}
-                        className={`flex items-center gap-3 px-12 py-4 rounded-2xl font-bold text-base transition-all ${isStartingInterview ? "bg-gray-300 text-gray-700 cursor-not-allowed" : "bg-primary text-white hover:bg-primary-dark hover:shadow-lg"}`}
+                        disabled={isStartingInterview || limitReached}
+                        className={`flex items-center gap-3 px-12 py-4 rounded-2xl font-bold text-base transition-all ${(isStartingInterview || limitReached) ? "bg-gray-300 text-gray-700 cursor-not-allowed" : "bg-primary text-white hover:bg-primary-dark hover:shadow-lg"}`}
                     >
                         {isStartingInterview ? "Starting Interview..." : "Start Interview"}
                         <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                         </svg>
                     </button>
-                    <p className="text-xs text-gray-400">By starting, you agree to our terms of practice.</p>
+                    {limitReached ? (
+                        <div className="flex flex-col items-center gap-2 mt-2">
+                            <p className="text-sm font-bold text-red-500">You have reached your mock interview limit for this month.</p>
+                            <Link to="/pricing" className="text-primary font-bold hover:underline">Upgrade your plan</Link>
+                        </div>
+                    ) : (
+                        <p className="text-xs text-gray-400 mt-2">
+                            {subscription && subscription.mockInterviewsLimit !== -1 
+                                ? `You have ${subscription.mockInterviewsLimit - (subscription.mockInterviewsUsed || 0)} mock interviews remaining this cycle.` 
+                                : ""}
+                            <br/>By starting, you agree to our terms of practice.
+                        </p>
+                    )}
                 </div>
             </main>
 
