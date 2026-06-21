@@ -108,7 +108,7 @@ public class PracticeService {
                 .audioStoragePath(cleanBlank(request.getAudioStoragePath()))
                 .inputType(request.getInputType() != null ? request.getInputType() : InputType.TEXT)
                 .build();
-        applyAiFeedback(answer, session, question);
+        applyAiFeedback(answer, session, question, request.getOutputLanguage());
         PracticeAnswer saved = practiceAnswerRepository.save(answer);
         updateSessionAndMetrics(session, question, saved);
         return mapAnswer(saved);
@@ -125,7 +125,7 @@ public class PracticeService {
         return practiceAnswerRepository.findAllByPracticeSessionId(sessionId).stream().map(this::mapAnswer).toList();
     }
 
-    private void applyAiFeedback(PracticeAnswer answer, PracticeSession session, QuestionBank question) {
+    private void applyAiFeedback(PracticeAnswer answer, PracticeSession session, QuestionBank question, String outputLanguage) {
         try {
             Map<String, Object> req = new HashMap<>();
             req.put("session_id", session.getId().toString());
@@ -133,6 +133,7 @@ public class PracticeService {
             req.put("question_text", question.getQuestionText());
             req.put("user_answer", answer.getAnswerText());
             req.put("practice_mode", true);
+            req.put("output_language", normalizeOutputLanguage(outputLanguage));
 
             String aiResponse = aiApiClient.submitQuestionBankPracticeAnswer(session.getId().toString(), req);
             JsonNode root = objectMapper.readTree(aiResponse);
@@ -237,6 +238,10 @@ public class PracticeService {
 
     private String cleanBlank(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private String normalizeOutputLanguage(String value) {
+        return "vi".equalsIgnoreCase(value != null ? value.trim() : null) ? "vi" : "en";
     }
 
     private BigDecimal decimalFrom(JsonNode node, String... fields) {

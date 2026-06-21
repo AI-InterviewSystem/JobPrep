@@ -6,5 +6,6 @@ import lombok.Data;
 public class StartInterviewSessionRequest {
     private String interviewType;
     private String interviewLevel;
+    private String interviewLanguage;
     private Integer numQuestions;
 }

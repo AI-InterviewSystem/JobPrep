@@ -7,6 +7,7 @@ import com.aiinterview.backend.repository.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -64,9 +65,7 @@ public class PaymentService {
         UserSubscription.BillingCycle cycle = UserSubscription.BillingCycle.valueOf(cycleStr.toUpperCase());
 
         // Check for existing active subscription
-        UserSubscription activeSub = subscriptionRepository
-                .findFirstByUserEmailAndStatusOrderByCreatedAtDesc(email, UserSubscription.Status.ACTIVE)
-                .orElse(null);
+        UserSubscription activeSub = findCurrentActiveSubscription(email);
 
         BigDecimal finalAmountUsd;
         Payment.Type paymentType;
@@ -324,9 +323,10 @@ public class PaymentService {
     @Transactional
     public void cancelSubscription() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        UserSubscription subscription = subscriptionRepository
-                .findFirstByUserEmailAndStatusOrderByCreatedAtDesc(email, UserSubscription.Status.ACTIVE)
-                .orElseThrow(() -> new AppException("No active subscription found"));
+        UserSubscription subscription = findCurrentActiveSubscription(email);
+        if (subscription == null) {
+            throw new AppException("No active subscription found");
+        }
 
         subscription.setCancelAtPeriodEnd(true);
         subscription.setStatus(UserSubscription.Status.ACTIVE_NON_RENEWING);
@@ -337,13 +337,9 @@ public class PaymentService {
     public SubscriptionStatusResponse getCurrentSubscription() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByEmail(email).orElseThrow(() -> new AppException("User not found"));
-        LocalDateTime now = LocalDateTime.now();
         LocalDateTime startOfMonth = LocalDate.now().withDayOfMonth(1).atStartOfDay();
 
-        UserSubscription activeSub = subscriptionRepository.findFirstByUserEmailAndStatusInOrderByCreatedAtDesc(
-                email, List.of(UserSubscription.Status.ACTIVE, UserSubscription.Status.ACTIVE_NON_RENEWING))
-                .filter(sub -> sub.getCurrentPeriodEnd() == null || sub.getCurrentPeriodEnd().isAfter(now))
-                .orElse(null);
+        UserSubscription activeSub = findCurrentActiveSubscription(email);
 
         if (activeSub != null) {
             Integer interviewsLimit = -1; // Default to unlimited unless features specify otherwise
@@ -417,5 +413,16 @@ public class PaymentService {
             }
         }
         paymentRepository.save(payment);
+    }
+
+    private UserSubscription findCurrentActiveSubscription(String email) {
+        return subscriptionRepository.findCurrentActiveByUserEmail(
+                email,
+                List.of(UserSubscription.Status.ACTIVE, UserSubscription.Status.ACTIVE_NON_RENEWING),
+                LocalDateTime.now(),
+                PageRequest.of(0, 1))
+                .stream()
+                .findFirst()
+                .orElse(null);
     }
 }

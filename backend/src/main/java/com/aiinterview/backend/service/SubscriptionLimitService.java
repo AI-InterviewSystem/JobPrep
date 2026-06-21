@@ -7,6 +7,7 @@ import com.aiinterview.backend.repository.InterviewSessionRepository;
 import com.aiinterview.backend.repository.PracticeAnswerRepository;
 import com.aiinterview.backend.repository.UserSubscriptionRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -76,10 +77,11 @@ public class SubscriptionLimitService {
     }
 
     private UserSubscription getActiveSubscription(User user) {
-        return subscriptionRepository.findFirstByUserEmailAndStatusInOrderByCreatedAtDesc(
+        return subscriptionRepository.findCurrentActiveByUserEmail(
                 user.getEmail(),
-                List.of(UserSubscription.Status.ACTIVE, UserSubscription.Status.ACTIVE_NON_RENEWING)
-        ).filter(sub -> sub.getCurrentPeriodEnd() == null || sub.getCurrentPeriodEnd().isAfter(LocalDateTime.now()))
-        .orElse(null);
+                List.of(UserSubscription.Status.ACTIVE, UserSubscription.Status.ACTIVE_NON_RENEWING),
+                LocalDateTime.now(),
+                PageRequest.of(0, 1)
+        ).stream().findFirst().orElse(null);
     }
 }

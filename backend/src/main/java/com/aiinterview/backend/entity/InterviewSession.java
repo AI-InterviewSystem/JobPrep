@@ -28,6 +28,11 @@ public class InterviewSession {
         COMPLETED
     }
 
+    public enum InterviewLanguage {
+        EN,
+        VI
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
@@ -60,6 +65,11 @@ public class InterviewSession {
     @Column(name = "interview_type", length = 50)
     @Builder.Default
     private String interviewType = "mock";
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "interview_language", length = 10)
+    @Builder.Default
+    private InterviewLanguage interviewLanguage = InterviewLanguage.EN;
 
     @Column(name = "role_snapshot", length = 100)
     private String roleSnapshot;

@@ -44,6 +44,10 @@ public class DatabaseInitialization {
         try {
             jdbcTemplate.execute("ALTER TABLE interview_sessions ADD COLUMN IF NOT EXISTS title VARCHAR(255)");
             jdbcTemplate.execute("ALTER TABLE interview_sessions ADD COLUMN IF NOT EXISTS interview_type VARCHAR(50) DEFAULT 'mock'");
+            jdbcTemplate.execute("ALTER TABLE interview_sessions ADD COLUMN IF NOT EXISTS interview_language VARCHAR(10) DEFAULT 'EN'");
+            jdbcTemplate.execute("ALTER TABLE interview_sessions ALTER COLUMN interview_language SET DEFAULT 'EN'");
+            jdbcTemplate.execute("UPDATE interview_sessions SET interview_language = UPPER(interview_language) WHERE interview_language IN ('en', 'vi')");
+            jdbcTemplate.execute("UPDATE interview_sessions SET interview_language = 'EN' WHERE interview_language IS NULL OR interview_language = ''");
             jdbcTemplate.execute("ALTER TABLE interview_sessions ADD COLUMN IF NOT EXISTS role_snapshot VARCHAR(100)");
             jdbcTemplate.execute("ALTER TABLE interview_sessions ADD COLUMN IF NOT EXISTS level_snapshot VARCHAR(100)");
             jdbcTemplate.execute("ALTER TABLE interview_sessions ADD COLUMN IF NOT EXISTS total_questions INTEGER DEFAULT 0");

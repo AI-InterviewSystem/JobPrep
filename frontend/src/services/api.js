@@ -257,18 +257,20 @@ export const behaviorApi = {
 export const aiHelpersApi = {
     checkCvJd: (data) => api.post('/ai-helpers/check-cv-jd', data),
     checkCurrentCvJd: (data) => api.post('/ai-helpers/check-current-cv-jd', data),
-    checkCvJdFile: (file, jobDescription) => {
+    checkCvJdFile: (file, jobDescription, outputLanguage = 'en') => {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('job_description', jobDescription);
+        formData.append('output_language', outputLanguage);
         return api.post('/ai-helpers/check-cv-jd-file', formData, {
             headers: { 'Content-Type': 'multipart/form-data' }
         });
     },
-    extractAndCheck: (file, jobDescription) => {
+    extractAndCheck: (file, jobDescription, outputLanguage = 'en') => {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('job_description', jobDescription);
+        formData.append('output_language', outputLanguage);
         return api.post('/ai-helpers/extract-and-check', formData, {
             headers: { 'Content-Type': 'multipart/form-data' }
         });

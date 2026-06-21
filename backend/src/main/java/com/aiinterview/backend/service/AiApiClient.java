@@ -102,22 +102,36 @@ public class AiApiClient {
     }
 
     public String checkCvJdFile(MultipartFile file, String jobDescription) {
-        return sendMultipartWithJobDescription(file, jobDescription, "/check-cv-jd-file");
+        return checkCvJdFile(file, jobDescription, "en");
+    }
+
+    public String checkCvJdFile(MultipartFile file, String jobDescription, String outputLanguage) {
+        return sendMultipartWithJobDescription(file, jobDescription, outputLanguage, "/check-cv-jd-file");
     }
 
     public String extractAndCheck(MultipartFile file, String jobDescription) {
-        return sendMultipartWithJobDescription(file, jobDescription, "/extract-and-check");
+        return extractAndCheck(file, jobDescription, "en");
     }
 
-    private String sendMultipartWithJobDescription(MultipartFile file, String jobDescription, String endpoint) {
+    public String extractAndCheck(MultipartFile file, String jobDescription, String outputLanguage) {
+        return sendMultipartWithJobDescription(file, jobDescription, outputLanguage, "/extract-and-check");
+    }
+
+    private String sendMultipartWithJobDescription(MultipartFile file, String jobDescription,
+            String outputLanguage, String endpoint) {
         try {
             MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
             body.add("file", buildFileResource(file.getBytes(), file.getOriginalFilename(), file.getContentType()));
             body.add("job_description", jobDescription);
+            body.add("output_language", normalizeOutputLanguage(outputLanguage));
             return postMultipart(endpoint, body);
         } catch (Exception e) {
             throw wrapAiError(endpoint, e);
         }
+    }
+
+    private String normalizeOutputLanguage(String outputLanguage) {
+        return "vi".equalsIgnoreCase(outputLanguage != null ? outputLanguage.trim() : null) ? "vi" : "en";
     }
 
     private ByteArrayResource buildFileResource(byte[] fileBytes, String filename, String contentType) {
