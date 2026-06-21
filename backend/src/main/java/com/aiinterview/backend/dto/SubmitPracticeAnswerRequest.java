@@ -14,4 +14,5 @@ public class SubmitPracticeAnswerRequest {
     private String audioStoragePath;
     private InputType inputType;
     private Boolean practiceMode;
+    private String outputLanguage;
 }

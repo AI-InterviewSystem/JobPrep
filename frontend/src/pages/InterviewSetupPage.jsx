@@ -19,6 +19,8 @@ export default function InterviewSetupPage() {
     const [experienceLevels, setExperienceLevels] = useState([])
     const [loadingLevels, setLoadingLevels] = useState(true)
     const [selectedLevel, setSelectedLevel] = useState("")
+    const [selectedLanguage, setSelectedLanguage] = useState("EN")
+    const [selectedDurationMinutes, setSelectedDurationMinutes] = useState(10)
     const selectedType = "Technical"
 
     const [cvs, setCvs] = useState([])
@@ -100,6 +102,7 @@ export default function InterviewSetupPage() {
         try {
             const res = await aiHelpersApi.checkCurrentCvJd({
                 job_description: jobDescription,
+                output_language: selectedLanguage.toLowerCase(),
             })
             const result = typeof res.data === "string" ? JSON.parse(res.data) : res.data
 
@@ -185,6 +188,7 @@ export default function InterviewSetupPage() {
             const startSessionRes = await interviewSessionApi.start(createSessionRes.data.id, {
                 interviewType: selectedType,
                 interviewLevel: selectedLevel,
+                interviewLanguage: selectedLanguage,
                 numQuestions: 10,
             })
 
@@ -195,6 +199,8 @@ export default function InterviewSetupPage() {
                 selectedIndustry: "", // Reset industry since job selection is removed
                 selectedLevel,
                 selectedType,
+                selectedLanguage,
+                selectedDurationMinutes,
                 numQuestions: 10,
                 keyRequirements,
                 jdId: finalJdId,
@@ -323,6 +329,13 @@ export default function InterviewSetupPage() {
                         )}
                     </div>
                 </div>
+
+                {limitReached && (
+                    <div className="mb-6 rounded-2xl bg-red-50 border border-red-100 px-5 py-4 text-center animate-entry">
+                        <p className="text-sm font-bold text-red-500">You have reached your mock interview limit for this month</p>
+                        <Link to="/pricing" className="mt-2 inline-block text-primary font-bold hover:underline">Upgrade your plan</Link>
+                    </div>
+                )}
 
                 <div className="space-y-6">
                     {/* CV Upload Section */}
@@ -608,6 +621,72 @@ export default function InterviewSetupPage() {
                         </div>
                     </div>
 
+                    {/* Interview Language */}
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                        <div className="flex items-center gap-2 mb-5">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                            </svg>
+                            <h2 className="font-bold text-gray-900 text-lg">Select Interview Language</h2>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {[
+                                { code: "EN", label: "English", description: "AI asks questions and gives feedback in English" },
+                                { code: "VI", label: "Tiếng Việt", description: "AI asks questions and gives feedback in Vietnamese" },
+                            ].map(({ code, label, description }) => (
+                                <button
+                                    key={code}
+                                    type="button"
+                                    onClick={() => setSelectedLanguage(code)}
+                                    className={`relative text-left p-4 rounded-xl border-2 transition-all ${selectedLanguage === code
+                                        ? "border-primary bg-blue-50"
+                                        : "border-gray-100 bg-gray-50 hover:border-primary/40"
+                                        }`}
+                                >
+                                    <div className="flex items-start gap-3">
+                                        <span className={`mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectedLanguage === code ? "border-primary" : "border-gray-300"}`}>
+                                            {selectedLanguage === code && <span className="w-2.5 h-2.5 rounded-full bg-primary" />}
+                                        </span>
+                                        <span>
+                                            <span className="block font-bold text-gray-900 text-sm">{label}</span>
+                                            <span className="block text-xs text-gray-400 mt-1">{description}</span>
+                                        </span>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                        <div className="mt-4 rounded-xl bg-gray-50 border border-gray-100 px-4 py-3">
+                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Voice Output</p>
+                            <p className="text-sm text-gray-700">Same as interview language</p>
+                        </div>
+                    </div>
+
+                    {/* Interview Duration */}
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                        <div className="flex items-center gap-2 mb-5">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <h2 className="font-bold text-gray-900 text-lg">Interview Duration</h2>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            {[10, 20].map((minutes) => (
+                                <button
+                                    key={minutes}
+                                    type="button"
+                                    onClick={() => setSelectedDurationMinutes(minutes)}
+                                    className={`p-4 rounded-xl border-2 text-left transition-all ${selectedDurationMinutes === minutes
+                                        ? "border-primary bg-blue-50"
+                                        : "border-gray-100 bg-gray-50 hover:border-primary/40"
+                                        }`}
+                                >
+                                    <p className="font-bold text-gray-900">{minutes} minutes</p>
+                                    <p className="text-xs text-gray-400 mt-1">{minutes === 10 ? "Quick mock interview" : "Fuller practice session"}</p>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
                     {/* Experience Level */}
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
                         <div className="flex items-center gap-2 mb-5">
@@ -638,9 +717,6 @@ export default function InterviewSetupPage() {
                                             animate={{ scale: 1 }}
                                             className="absolute top-3 right-3 flex items-center gap-1.5"
                                         >
-                                            {isAutoSelected && (
-                                                <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded-md uppercase tracking-wider">AI Choice</span>
-                                            )}
                                             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-primary" viewBox="0 0 20 20" fill="currentColor">
                                                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                                             </svg>
@@ -671,17 +747,12 @@ export default function InterviewSetupPage() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                         </svg>
                     </button>
-                    {limitReached ? (
-                        <div className="flex flex-col items-center gap-2 mt-2">
-                            <p className="text-sm font-bold text-red-500">You have reached your mock interview limit for this month.</p>
-                            <Link to="/pricing" className="text-primary font-bold hover:underline">Upgrade your plan</Link>
-                        </div>
-                    ) : (
+                    {!limitReached && (
                         <p className="text-xs text-gray-400 mt-2">
                             {subscription && subscription.mockInterviewsLimit !== -1 
                                 ? `You have ${subscription.mockInterviewsLimit - (subscription.mockInterviewsUsed || 0)} mock interviews remaining this cycle.` 
                                 : ""}
-                            <br/>By starting, you agree to our terms of practice.
+                            <br/>By starting, you agree to our terms of practice
                         </p>
                     )}
                 </div>

@@ -1,6 +1,7 @@
 package com.aiinterview.backend.dto;
 
 import com.aiinterview.backend.entity.InterviewSession.InterviewStatus;
+import com.aiinterview.backend.entity.InterviewSession.InterviewLanguage;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -21,6 +22,7 @@ public class InterviewSessionResponse {
     private LocalDateTime endTime;
     private String title;
     private String interviewType;
+    private InterviewLanguage interviewLanguage;
     private String roleSnapshot;
     private String levelSnapshot;
     private Integer totalQuestions;

@@ -2,6 +2,7 @@ package com.aiinterview.backend.service;
 
 import com.aiinterview.backend.dto.*;
 import com.aiinterview.backend.entity.*;
+import com.aiinterview.backend.entity.InterviewSession.InterviewLanguage;
 import com.aiinterview.backend.entity.InterviewAnswer.InputType;
 import com.aiinterview.backend.entity.InterviewSession.InterviewStatus;
 import com.aiinterview.backend.exception.AppException;
@@ -103,6 +104,8 @@ public class InterviewSessionService {
 
         String interviewType = mapInterviewType(startRequest != null ? startRequest.getInterviewType() : null);
         String interviewLevel = mapInterviewLevel(startRequest != null ? startRequest.getInterviewLevel() : null);
+        InterviewLanguage interviewLanguage = mapInterviewLanguage(
+                startRequest != null ? startRequest.getInterviewLanguage() : null);
         int numQuestions = startRequest != null && startRequest.getNumQuestions() != null
                 ? startRequest.getNumQuestions()
                 : 10;
@@ -118,12 +121,14 @@ public class InterviewSessionService {
             }
             req.put("interview_type", interviewType);
             req.put("interview_level", interviewLevel);
+            req.put("output_language", interviewLanguage.name().toLowerCase(Locale.ROOT));
             req.put("num_questions", numQuestions);
             req.put("passing_score", 0);
 
             log.info(
-                    "Starting AI interview session. sessionId={}, interviewType={}, interviewLevel={}, numQuestions={}, hasJobDescription={}",
-                    sessionId, interviewType, interviewLevel, numQuestions, session.getJobDescription() != null);
+                    "Starting AI interview session. sessionId={}, interviewType={}, interviewLevel={}, interviewLanguage={}, numQuestions={}, hasJobDescription={}",
+                    sessionId, interviewType, interviewLevel, interviewLanguage, numQuestions,
+                    session.getJobDescription() != null);
             String aiResponse = aiApiClient.startInterview(req);
 
             JsonNode resNode = objectMapper.readTree(aiResponse);
@@ -137,6 +142,7 @@ public class InterviewSessionService {
             session.setStatus(InterviewStatus.IN_PROGRESS);
             session.setStartTime(LocalDateTime.now());
             session.setInterviewType(interviewType);
+            session.setInterviewLanguage(interviewLanguage);
             session.setLevelSnapshot(interviewLevel);
             session.setTotalQuestions(numQuestions);
             session.setCompletedQuestions(0);
@@ -207,6 +213,17 @@ public class InterviewSessionService {
         };
     }
 
+    private InterviewLanguage mapInterviewLanguage(String language) {
+        if (language == null || language.isBlank()) {
+            return InterviewLanguage.EN;
+        }
+        String normalized = language.trim().replace("-", "_").toUpperCase(Locale.ROOT);
+        return switch (normalized) {
+            case "VI", "VN", "VIE", "VIETNAMESE", "TIENG_VIET", "TIẾNG_VIỆT" -> InterviewLanguage.VI;
+            default -> InterviewLanguage.EN;
+        };
+    }
+
     @Transactional
     public SubmitAnswerResponse submitAnswer(UUID sessionId, String userEmail, SubmitAnswerRequest request) {
         InterviewSession session = findSession(sessionId, userEmail);
@@ -233,6 +250,7 @@ public class InterviewSessionService {
             req.put("session_id", session.getAiSessionId());
             req.put("question_id", question.getAiQuestionId());
             req.put("user_answer", request.getAnswerText());
+            req.put("output_language", interviewLanguageCode(session));
 
             String aiResponse = aiApiClient.submitAnswer(req);
             JsonNode resNode = objectMapper.readTree(aiResponse);
@@ -261,7 +279,8 @@ public class InterviewSessionService {
             updateQuestionProgress(session);
 
             JsonNode nextQ = resNode.get("next_question");
-            if (nextQ != null && !nextQ.isNull()) {
+            boolean aiCompleted = resNode.has("status") && "completed".equalsIgnoreCase(resNode.get("status").asText());
+            if (!aiCompleted && nextQ != null && !nextQ.isNull()) {
                 saveAiQuestion(session, nextQ, (question.getOrderIndex() != null ? question.getOrderIndex() : 0) + 1);
             }
             return SubmitAnswerResponse.builder().answerId(savedAnswer.getId()).build();
@@ -296,6 +315,7 @@ public class InterviewSessionService {
         try {
             Map<String, Object> req = new HashMap<>();
             req.put("session_id", session.getAiSessionId());
+            req.put("output_language", interviewLanguageCode(session));
 
             String aiResponse = aiApiClient.getSummary(req);
             JsonNode resNode = objectMapper.readTree(aiResponse);
@@ -454,10 +474,24 @@ public class InterviewSessionService {
         if (questionText.isBlank()) {
             return;
         }
+        String aiQuestionId = nextQ.has("id") ? nextQ.get("id").asText() : "";
+        List<InterviewQuestion> existingQuestions = questionRepository.findBySessionIdOrderByOrderIndexAsc(session.getId());
+        boolean alreadySaved = existingQuestions.stream().anyMatch(existing -> {
+            boolean sameAiId = aiQuestionId != null && !aiQuestionId.isBlank()
+                    && aiQuestionId.equals(existing.getAiQuestionId());
+            boolean sameOrder = existing.getOrderIndex() != null && existing.getOrderIndex().equals(orderIndex);
+            boolean sameText = questionText.equals(existing.getQuestionText());
+            return sameAiId || sameOrder || sameText;
+        });
+        if (alreadySaved) {
+            log.info("Skipping duplicate AI question for sessionId={}, aiQuestionId={}, orderIndex={}",
+                    session.getId(), aiQuestionId, orderIndex);
+            return;
+        }
         InterviewQuestion q = InterviewQuestion.builder()
                 .session(session)
                 .questionText(questionText)
-                .aiQuestionId(nextQ.has("id") ? nextQ.get("id").asText() : "")
+                .aiQuestionId(aiQuestionId)
                 .questionSource(QuestionSource.AI_GENERATED)
                 .jobRequirementTag(nextQ.has("topic") ? nextQ.get("topic").asText() : "")
                 .orderIndex(orderIndex)
@@ -533,6 +567,7 @@ public class InterviewSessionService {
                 .endTime(session.getEndTime())
                 .title(session.getTitle())
                 .interviewType(session.getInterviewType())
+                .interviewLanguage(session.getInterviewLanguage() != null ? session.getInterviewLanguage() : InterviewLanguage.EN)
                 .roleSnapshot(session.getRoleSnapshot())
                 .levelSnapshot(session.getLevelSnapshot())
                 .totalQuestions(session.getTotalQuestions())
@@ -647,6 +682,13 @@ public class InterviewSessionService {
             return null;
         }
         return value.trim();
+    }
+
+    private String interviewLanguageCode(InterviewSession session) {
+        InterviewLanguage language = session.getInterviewLanguage() != null
+                ? session.getInterviewLanguage()
+                : InterviewLanguage.EN;
+        return language.name().toLowerCase(Locale.ROOT);
     }
 
     private String buildSessionTitle(String role, String level) {

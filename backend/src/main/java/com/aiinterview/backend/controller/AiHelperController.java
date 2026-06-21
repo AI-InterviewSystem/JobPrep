@@ -25,6 +25,7 @@ public class AiHelperController {
 
     @PostMapping("/check-cv-jd")
     public ResponseEntity<String> checkCvJd(@RequestBody Map<String, Object> body) {
+        body.put("output_language", normalizeOutputLanguage(body.get("output_language")));
         return ResponseEntity.ok(aiApiClient.checkCvJd(body));
     }
 
@@ -42,6 +43,7 @@ public class AiHelperController {
         Map<String, Object> request = new HashMap<>();
         request.put("cv_data", cvUploadService.getCvDataForAi(user));
         request.put("job_description", jobDescription);
+        request.put("output_language", normalizeOutputLanguage(body.get("output_language")));
 
         return ResponseEntity.ok(aiApiClient.checkCvJd(request));
     }
@@ -49,19 +51,29 @@ public class AiHelperController {
     @PostMapping("/check-cv-jd-file")
     public ResponseEntity<String> checkCvJdFile(
             @RequestParam("file") MultipartFile file,
-            @RequestParam("job_description") String jobDescription) {
-        return ResponseEntity.ok(aiApiClient.checkCvJdFile(file, jobDescription));
+            @RequestParam("job_description") String jobDescription,
+            @RequestParam(value = "output_language", required = false) String outputLanguage) {
+        return ResponseEntity.ok(aiApiClient.checkCvJdFile(file, jobDescription, normalizeOutputLanguage(outputLanguage)));
     }
 
     @PostMapping("/extract-and-check")
     public ResponseEntity<String> extractAndCheck(
             @RequestParam("file") MultipartFile file,
-            @RequestParam("job_description") String jobDescription) {
-        return ResponseEntity.ok(aiApiClient.extractAndCheck(file, jobDescription));
+            @RequestParam("job_description") String jobDescription,
+            @RequestParam(value = "output_language", required = false) String outputLanguage) {
+        return ResponseEntity.ok(aiApiClient.extractAndCheck(file, jobDescription, normalizeOutputLanguage(outputLanguage)));
     }
 
     @PostMapping("/generate-questions")
     public ResponseEntity<String> generateQuestions(@RequestBody Map<String, Object> body) {
+        body.put("output_language", normalizeOutputLanguage(body.get("output_language")));
         return ResponseEntity.ok(aiApiClient.generateQuestions(body));
+    }
+
+    private String normalizeOutputLanguage(Object value) {
+        if (value == null) {
+            return "en";
+        }
+        return "vi".equalsIgnoreCase(value.toString().trim()) ? "vi" : "en";
     }
 }

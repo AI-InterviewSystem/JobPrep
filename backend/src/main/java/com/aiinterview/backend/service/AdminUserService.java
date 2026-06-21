@@ -19,7 +19,6 @@ import com.aiinterview.backend.entity.AdminAction;
 import com.aiinterview.backend.repository.AdminActionRepository;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -138,14 +137,17 @@ public class AdminUserService {
         String currentPlan = "Free";
         String subscriptionStatus = null;
         try {
-            Optional<UserSubscription> activeSub = userSubscriptionRepository
-                    .findFirstByUserEmailAndStatusInOrderByCreatedAtDesc(
+            List<UserSubscription> activeSubs = userSubscriptionRepository
+                    .findCurrentActiveByUserEmail(
                             user.getEmail(),
-                            List.of(UserSubscription.Status.ACTIVE, UserSubscription.Status.ACTIVE_NON_RENEWING)
+                            List.of(UserSubscription.Status.ACTIVE, UserSubscription.Status.ACTIVE_NON_RENEWING),
+                            java.time.LocalDateTime.now(),
+                            PageRequest.of(0, 1)
                     );
-            if (activeSub.isPresent()) {
-                currentPlan = activeSub.get().getPlan().getName();
-                subscriptionStatus = activeSub.get().getStatus().name();
+            if (!activeSubs.isEmpty()) {
+                UserSubscription activeSub = activeSubs.get(0);
+                currentPlan = activeSub.getPlan().getName();
+                subscriptionStatus = activeSub.getStatus().name();
             }
         } catch (Exception ignored) {
             // nếu không có subscription thì để Free

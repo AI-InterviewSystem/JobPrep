@@ -1,8 +1,9 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion"
 import { useRef, useState } from "react";
-import html2pdf from "html2pdf.js";
-import logo from "../assets/images/jobprep-logo.png"
+import { jsPDF } from "jspdf";
+import arialFontUrl from "../assets/fonts/arial.ttf?url"
+import arialBoldFontUrl from "../assets/fonts/arialbd.ttf?url"
 
 // Simple circular progress SVG
 function CircularScore({ score, label, size = 160, color = "#0058bd" }) {
@@ -69,6 +70,33 @@ function formatBehaviorWarning(warning) {
     return String(warning)
 }
 
+async function fetchFontAsBase64(url) {
+    const response = await fetch(url)
+    if (!response.ok) {
+        throw new Error(`Unable to load PDF font: ${response.status}`)
+    }
+    const buffer = await response.arrayBuffer()
+    let binary = ""
+    const bytes = new Uint8Array(buffer)
+    const chunkSize = 0x8000
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
+    }
+    return window.btoa(binary)
+}
+
+async function registerVietnamesePdfFont(doc) {
+    const [regularFont, boldFont] = await Promise.all([
+        fetchFontAsBase64(arialFontUrl),
+        fetchFontAsBase64(arialBoldFontUrl),
+    ])
+    doc.addFileToVFS("JobPrepArial.ttf", regularFont)
+    doc.addFileToVFS("JobPrepArialBold.ttf", boldFont)
+    doc.addFont("JobPrepArial.ttf", "JobPrepArial", "normal")
+    doc.addFont("JobPrepArialBold.ttf", "JobPrepArial", "bold")
+    doc.setFont("JobPrepArial", "normal")
+}
+
 export default function InterviewResultPage() {
     const navigate = useNavigate();
     const location = useLocation();
@@ -77,23 +105,133 @@ export default function InterviewResultPage() {
     const [isDownloading, setIsDownloading] = useState(false);
 
     const handleDownloadPdf = async () => {
-        const element = reportRef.current;
-        if (!element) return;
-
         setIsDownloading(true);
-        const opt = {
-            margin: [0.5, 0.3, 0.5, 0.3], // top, right, bottom, left
-            filename: 'JobPrep_Interview_Report.pdf',
-            pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true },
-            jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-        };
-
         try {
-            await html2pdf().set(opt).from(element).save();
+            const doc = new jsPDF({ unit: "pt", format: "a4", orientation: "portrait" })
+            await registerVietnamesePdfFont(doc)
+            const pageWidth = doc.internal.pageSize.getWidth()
+            const pageHeight = doc.internal.pageSize.getHeight()
+            const margin = 42
+            const contentWidth = pageWidth - margin * 2
+            let y = margin
+
+            const normalize = (value) => String(value ?? "")
+                .replace(/\r\n/g, "\n")
+                .replace(/[•●]/g, "-")
+                .replace(/[“”]/g, '"')
+                .replace(/[‘’]/g, "'")
+
+            const ensureSpace = (height = 24) => {
+                if (y + height > pageHeight - margin) {
+                    doc.addPage()
+                    y = margin
+                }
+            }
+
+            const addText = (value, options = {}) => {
+                const {
+                    size = 10,
+                    style = "normal",
+                    color = [55, 65, 81],
+                    gap = 6,
+                    indent = 0,
+                    width = contentWidth - indent,
+                } = options
+                doc.setFont("JobPrepArial", style)
+                doc.setFontSize(size)
+                doc.setTextColor(...color)
+                const lines = doc.splitTextToSize(normalize(value), width)
+                const lineHeight = size * 1.35
+                ensureSpace(lines.length * lineHeight + gap)
+                doc.text(lines, margin + indent, y)
+                y += lines.length * lineHeight + gap
+            }
+
+            const addSectionTitle = (title) => {
+                ensureSpace(34)
+                y += 8
+                doc.setDrawColor(229, 231, 235)
+                doc.line(margin, y, pageWidth - margin, y)
+                y += 22
+                addText(title, { size: 14, style: "bold", color: [17, 24, 39], gap: 10 })
+            }
+
+            const addList = (items, emptyText) => {
+                const safeItems = Array.isArray(items) ? items.filter(Boolean) : []
+                if (safeItems.length === 0) {
+                    addText(emptyText, { color: [107, 114, 128] })
+                    return
+                }
+                safeItems.forEach(item => addText(`- ${item}`, { indent: 10, gap: 4 }))
+            }
+
+            doc.setFont("JobPrepArial", "bold")
+            doc.setFontSize(22)
+            doc.setTextColor(0, 88, 189)
+            doc.text("JobPrep Interview Report", margin, y)
+            y += 26
+            addText("Detailed feedback for your mock interview session.", { size: 11, color: [75, 85, 99], gap: 14 })
+
+            addSectionTitle("Score Summary")
+            addText(`Overall Score: ${overallScore}%`, { size: 12, style: "bold", color: [17, 24, 39] })
+            addText(`Interview Score: ${interviewScore != null ? `${interviewScore}%` : "N/A"}`)
+            addText(`CV Match Score: ${cvScore != null ? `${cvScore}%` : "N/A"}`)
+
+            if (Array.isArray(scoringBreakdown?.question_scores) && scoringBreakdown.question_scores.length > 0) {
+                addText(`Per-question scores: ${scoringBreakdown.question_scores.map((score, index) => `Q${index + 1}: ${score}/100`).join(" | ")}`)
+            }
+
+            addSectionTitle("Strengths")
+            addList(session?.strengths, "No specific strengths noted.")
+
+            addSectionTitle("Areas to Improve")
+            addList(session?.weaknesses, "No areas for improvement noted.")
+
+            addSectionTitle("AI Summary & Feedback")
+            addText(session?.summaryText || "No summary available for this session.")
+
+            if (behaviorReport) {
+                addSectionTitle("Behavior Monitoring")
+                addText(`Total Frames: ${behaviorReport.total_frames ?? "N/A"}`)
+                addText(`Valid Face Ratio: ${behaviorReport.summary?.valid_face_ratio != null ? `${Math.round(Number(behaviorReport.summary.valid_face_ratio) * 100)}%` : "N/A"}`)
+                addText(`Looking Away Ratio: ${behaviorReport.summary?.looking_away_ratio != null ? `${Math.round(Number(behaviorReport.summary.looking_away_ratio) * 100)}%` : "N/A"}`)
+                addList(bWarnings, "No behavioral warnings recorded during the interview.")
+            }
+
+            addSectionTitle("Questions & Answers")
+            if (questions.length === 0) {
+                addText("No questions were saved for this session.", { color: [107, 114, 128] })
+            } else {
+                questions.forEach((question, index) => {
+                    const qScore = Array.isArray(scoringBreakdown?.question_scores)
+                        ? scoringBreakdown.question_scores[index]
+                        : question.answer?.score
+                    ensureSpace(70)
+                    addText(`Question ${question.orderIndex || index + 1}${qScore != null ? ` - ${qScore}/100` : ""}`, {
+                        size: 12,
+                        style: "bold",
+                        color: [0, 88, 189],
+                        gap: 6,
+                    })
+                    addText(question.questionText || "No question text saved.")
+                    addText(`Answer: ${question.answer?.answerText || "No answer text saved."}`)
+                    addText(`AI Feedback: ${question.answer?.feedback || "No AI feedback saved."}`, { gap: 14 })
+                })
+            }
+
+            const pageCount = doc.getNumberOfPages()
+            for (let page = 1; page <= pageCount; page += 1) {
+                doc.setPage(page)
+                doc.setFont("JobPrepArial", "normal")
+                doc.setFontSize(9)
+                doc.setTextColor(107, 114, 128)
+                doc.text(`Page ${page} of ${pageCount}`, pageWidth - margin - 58, pageHeight - 24)
+            }
+
+            doc.save("JobPrep_Interview_Report.pdf")
         } catch (error) {
             console.error("Error generating PDF:", error);
+            window.alert("Unable to generate the PDF report. Please try again.");
         } finally {
             setIsDownloading(false);
         }

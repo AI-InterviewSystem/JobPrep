@@ -4,10 +4,19 @@ import { motion, AnimatePresence } from "framer-motion"
 import { interviewSessionApi, behaviorApi } from "../services/api"
 
 const DEFAULT_TOTAL_QUESTIONS = 10
+const DEFAULT_DURATION_MINUTES = 10
 const INITIAL_QUESTION = 1
-const FRAME_INTERVAL_MS = 2000   // capture a webcam frame every 2 seconds
+const FRAME_INTERVAL_MS = 750   // capture a webcam frame about 1.3 times per second
 
 const aiMessage = `AI: "Thank you for that background. Now, regarding your experience..."`
+
+function normalizeInterviewLanguage(value) {
+    return String(value || "EN").trim().toUpperCase() === "VI" ? "VI" : "EN"
+}
+
+function browserLanguageCode(value) {
+    return normalizeInterviewLanguage(value) === "VI" ? "vi-VN" : "en-US"
+}
 
 // ─── Behavior warning overlay ────────────────────────────────────────────────
 function BehaviorWarningBanner({ warnings }) {
@@ -77,6 +86,7 @@ export default function LiveInterviewPage() {
     const [seconds, setSeconds] = useState(0)
     const [isPaused, setIsPaused] = useState(false)
     const [sessionSecondsLeft, setSessionSecondsLeft] = useState(14 * 60 + 22)
+    const [interviewLanguage, setInterviewLanguage] = useState("EN")
     const [isAiMuted, setIsAiMuted] = useState(false)
     const [isAiSpeaking, setIsAiSpeaking] = useState(false)
 
@@ -108,6 +118,8 @@ export default function LiveInterviewPage() {
             if (stored) {
                 try {
                     const parsed = JSON.parse(stored)
+                    setInterviewLanguage(normalizeInterviewLanguage(parsed?.selectedLanguage))
+                    setSessionSecondsLeft((Number(parsed?.selectedDurationMinutes) || DEFAULT_DURATION_MINUTES) * 60)
                     if (parsed?.sessionId) { setSessionId(parsed.sessionId); return }
                 } catch { /* ignore malformed */ }
             }
@@ -257,7 +269,7 @@ export default function LiveInterviewPage() {
         const recognition = new SpeechRecognition()
         recognition.continuous = true
         recognition.interimResults = true
-        recognition.lang = "en-US"
+        recognition.lang = browserLanguageCode(interviewLanguage)
         recognition.onresult = (event) => {
             let interimTranscript = ""
             let finalTranscript = transcriptRef.current
@@ -283,7 +295,7 @@ export default function LiveInterviewPage() {
             try { recognition.stop() } catch (e) { }
             recognitionRef.current = null
         }
-    }, [sessionStarted, isSubmittingAnswer, isPaused, isAiSpeaking])
+    }, [sessionStarted, isSubmittingAnswer, isPaused, isAiSpeaking, interviewLanguage])
 
     // ── Cleanup media stream ──────────────────────────────────────────────
     useEffect(() => {
@@ -311,12 +323,16 @@ export default function LiveInterviewPage() {
         const speak = () => {
             window.speechSynthesis.cancel()
             const utterance = new SpeechSynthesisUtterance(currentQuestionText)
-            utterance.lang = "en-US"; utterance.rate = 0.95; utterance.pitch = 1.0
+            const speechLang = browserLanguageCode(interviewLanguage)
+            utterance.lang = speechLang; utterance.rate = 0.95; utterance.pitch = 1.0
             utterance.onstart = () => setIsAiSpeaking(true)
             utterance.onend = () => setIsAiSpeaking(false)
             utterance.onerror = () => setIsAiSpeaking(false)
             const voices = window.speechSynthesis.getVoices()
-            const voice = voices.find(v => v.lang.startsWith("en") && (v.name.includes("Google") || v.name.includes("Natural"))) || voices[0]
+            const voicePrefix = speechLang.split("-")[0]
+            const voice = voices.find(v => v.lang.toLowerCase().startsWith(voicePrefix) && (v.name.includes("Google") || v.name.includes("Natural"))) ||
+                voices.find(v => v.lang.toLowerCase().startsWith(voicePrefix)) ||
+                voices[0]
             if (voice) utterance.voice = voice
             window.speechSynthesis.speak(utterance)
         }
@@ -324,7 +340,7 @@ export default function LiveInterviewPage() {
             window.speechSynthesis.onvoiceschanged = speak
         } else { speak() }
         return () => { window.speechSynthesis.cancel(); setIsAiSpeaking(false) }
-    }, [questionNum, sessionStarted, isAiMuted, isPaused])
+    }, [questionNum, sessionStarted, isAiMuted, isPaused, interviewLanguage])
 
     const fmt = (secs) => {
         const m = String(Math.floor(secs / 60)).padStart(2, "0")
@@ -332,7 +348,8 @@ export default function LiveInterviewPage() {
         return `${m}:${s}`
     }
 
-    const currentQuestionText = session?.questions?.[questionNum - 1]?.questionText || "Waiting for the AI interviewer to generate the next question..."
+    const currentQuestionText = session?.questions?.[questionNum - 1]?.questionText ||
+        (interviewLanguage === "VI" ? "Đang chờ AI tạo câu hỏi tiếp theo..." : "Waiting for the AI interviewer to generate the next question...")
     const totalQuestions = Math.max(1, Number(session?.totalQuestions) || DEFAULT_TOTAL_QUESTIONS)
     const progressPct = ((questionNum - 1) / totalQuestions) * 100
 
@@ -494,7 +511,11 @@ export default function LiveInterviewPage() {
                 try { setup = JSON.parse(stored) } catch { setup = null }
             }
             const desiredQuestions = Number(setup?.numQuestions) || DEFAULT_TOTAL_QUESTIONS
+            const desiredLanguage = normalizeInterviewLanguage(setup?.selectedLanguage)
+            setInterviewLanguage(desiredLanguage)
+            setSessionSecondsLeft((Number(setup?.selectedDurationMinutes) || DEFAULT_DURATION_MINUTES) * 60)
             const currentSessionRes = await interviewSessionApi.get(id)
+            setInterviewLanguage(normalizeInterviewLanguage(currentSessionRes.data?.interviewLanguage || desiredLanguage))
             const currentTotalQuestions = Number(currentSessionRes.data?.totalQuestions) || 0
             const canReuseSession =
                 currentSessionRes.data?.status === "IN_PROGRESS" &&
@@ -529,8 +550,10 @@ export default function LiveInterviewPage() {
             const startRes = await interviewSessionApi.start(startSessionId, {
                 interviewType: setup?.selectedType || "Technical",
                 interviewLevel: setup?.selectedLevel || "Junior",
+                interviewLanguage: desiredLanguage,
                 numQuestions: desiredQuestions,
             })
+            setInterviewLanguage(normalizeInterviewLanguage(startRes.data?.interviewLanguage || desiredLanguage))
             setSession(startRes.data)
             setSessionStarted(true)
             setPermissionError("")
