@@ -6,7 +6,7 @@ import { interviewSessionApi, behaviorApi } from "../services/api"
 const DEFAULT_TOTAL_QUESTIONS = 10
 const DEFAULT_DURATION_MINUTES = 10
 const INITIAL_QUESTION = 1
-const FRAME_INTERVAL_MS = 750   // capture a webcam frame about 1.3 times per second
+const FRAME_INTERVAL_MS = 750
 
 const aiMessage = `AI: "Thank you for that background. Now, regarding your experience..."`
 
@@ -18,7 +18,6 @@ function browserLanguageCode(value) {
     return normalizeInterviewLanguage(value) === "VI" ? "vi-VN" : "en-US"
 }
 
-// ─── Behavior warning overlay ────────────────────────────────────────────────
 function BehaviorWarningBanner({ warnings }) {
     if (!warnings || warnings.length === 0) return null
     const latestWarning = formatBehaviorWarning(warnings[warnings.length - 1])
@@ -46,7 +45,6 @@ function formatBehaviorWarning(warning) {
     return String(warning)
 }
 
-// ─── Behavior status indicator ───────────────────────────────────────────────
 function BehaviorStatusDot({ faceCount, isLookingAway }) {
     let color = "bg-green-400"
     let label = "Face OK"
@@ -78,6 +76,7 @@ export default function LiveInterviewPage() {
     const [currentTranscript, setCurrentTranscript] = useState("")
     const [isRecording, setIsRecording] = useState(false)
     const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false)
+    const [isCompleting, setIsCompleting] = useState(false)
     const [supportSpeechRecognition, setSupportSpeechRecognition] = useState(true)
     const [recordingError, setRecordingError] = useState("")
 
@@ -90,12 +89,11 @@ export default function LiveInterviewPage() {
     const [isAiMuted, setIsAiMuted] = useState(false)
     const [isAiSpeaking, setIsAiSpeaking] = useState(false)
 
-    // ── Behavior monitoring state ─────────────────────────────────────────
     const [behaviorSessionId, setBehaviorSessionId] = useState(null)
     const [behaviorWarnings, setBehaviorWarnings] = useState([])
     const [behaviorFaceCount, setBehaviorFaceCount] = useState(1)
     const [behaviorLookingAway, setBehaviorLookingAway] = useState(false)
-    const behaviorSessionIdRef = useRef(null)   // kept in sync with state for callbacks
+    const behaviorSessionIdRef = useRef(null)
     const frameIntervalRef = useRef(null)
 
     const mediaRecorderRef = useRef(null)
@@ -104,10 +102,8 @@ export default function LiveInterviewPage() {
     const transcriptRef = useRef("")
     const questionStartTimeRef = useRef(null)
 
-    // ── Keep behavior session ref in sync ─────────────────────────────────
     useEffect(() => { behaviorSessionIdRef.current = behaviorSessionId }, [behaviorSessionId])
 
-    // ── Session loading ───────────────────────────────────────────────────
     useEffect(() => {
         const loadSession = async () => {
             const params = new URLSearchParams(location.search)
@@ -136,7 +132,6 @@ export default function LiveInterviewPage() {
         loadSession()
     }, [location.search])
 
-    // ── Timers ────────────────────────────────────────────────────────────
     useEffect(() => {
         if (!sessionStarted || isPaused) return
         const t1 = setInterval(() => setSeconds((prev) => prev + 1), 1000)
@@ -144,20 +139,17 @@ export default function LiveInterviewPage() {
         return () => { clearInterval(t1); clearInterval(t2) }
     }, [isPaused, sessionStarted])
 
-    // ── Video element ─────────────────────────────────────────────────────
     useEffect(() => {
         if (videoRef.current && mediaStream) {
             videoRef.current.srcObject = mediaStream
         }
     }, [mediaStream])
 
-    // ── Auto-request media permissions once session id is available ───────
     useEffect(() => {
         if (!sessionId) return
         requestMediaPermissions()
     }, [sessionId])
 
-    // ── Start behavior monitoring when interview session starts ───────────
     useEffect(() => {
         if (!sessionStarted || !permissionsGranted) return
 
@@ -179,7 +171,6 @@ export default function LiveInterviewPage() {
         return () => { cancelled = true }
     }, [sessionStarted, permissionsGranted])
 
-    // ── Periodic frame capture ────────────────────────────────────────────
     const captureAndSendFrame = useCallback(async () => {
         const bId = behaviorSessionIdRef.current
         if (!bId || !videoRef.current || !canvasRef.current) return
@@ -208,7 +199,6 @@ export default function LiveInterviewPage() {
                     }
                 }
             } catch (err) {
-                // silently skip failed frames
                 console.warn("[Behavior] frame upload error:", err?.message)
             }
         }, "image/jpeg", 0.7)
@@ -220,7 +210,6 @@ export default function LiveInterviewPage() {
         return () => clearInterval(frameIntervalRef.current)
     }, [behaviorSessionId, sessionStarted, captureAndSendFrame])
 
-    // ── Media recorder setup ──────────────────────────────────────────────
     useEffect(() => {
         if (!sessionStarted || !mediaStream) return
         if (!window.MediaRecorder) {
@@ -254,9 +243,8 @@ export default function LiveInterviewPage() {
         }
     }, [sessionStarted, mediaStream])
 
-    // ── Speech recognition ────────────────────────────────────────────────
     useEffect(() => {
-        if (!sessionStarted || isSubmittingAnswer || isPaused || isAiSpeaking) {
+        if (!sessionStarted || isSubmittingAnswer || isCompleting || isPaused || isAiSpeaking) {
             if (recognitionRef.current) {
                 try { recognitionRef.current.stop() } catch (e) { /* ignore */ }
             }
@@ -284,7 +272,7 @@ export default function LiveInterviewPage() {
         }
         recognition.onerror = (event) => console.error("SpeechRecognition error", event)
         recognition.onend = () => {
-            if (sessionStarted && !isSubmittingAnswer && !isPaused && !isAiSpeaking) {
+            if (sessionStarted && !isSubmittingAnswer && !isCompleting && !isPaused && !isAiSpeaking) {
                 try { recognition.start() } catch (err) { console.error("Failed to restart speech recognition", err) }
             }
         }
@@ -295,16 +283,14 @@ export default function LiveInterviewPage() {
             try { recognition.stop() } catch (e) { }
             recognitionRef.current = null
         }
-    }, [sessionStarted, isSubmittingAnswer, isPaused, isAiSpeaking, interviewLanguage])
+    }, [sessionStarted, isSubmittingAnswer, isCompleting, isPaused, isAiSpeaking, interviewLanguage])
 
-    // ── Cleanup media stream ──────────────────────────────────────────────
     useEffect(() => {
         return () => {
             if (mediaStream) mediaStream.getTracks().forEach((track) => track.stop())
         }
     }, [mediaStream])
 
-    // ── Cleanup behavior monitoring on unmount ────────────────────────────
     useEffect(() => {
         return () => {
             clearInterval(frameIntervalRef.current)
@@ -315,7 +301,6 @@ export default function LiveInterviewPage() {
         }
     }, [])
 
-    // ── AI voice ─────────────────────────────────────────────────────────
     useEffect(() => {
         if (!sessionStarted || !currentQuestionText || isAiMuted || isPaused) {
             window.speechSynthesis.cancel(); return
@@ -445,13 +430,11 @@ export default function LiveInterviewPage() {
         }
     }
 
-    // ── Complete interview: stop behavior monitoring, then navigate ────────
     const completeInterviewSession = async () => {
-        // Stop frame capture
+        setIsCompleting(true)
         clearInterval(frameIntervalRef.current)
         frameIntervalRef.current = null
 
-        // Fetch behavior report
         let behaviorReport = null
         const bId = behaviorSessionIdRef.current
         if (bId) {
@@ -473,11 +456,12 @@ export default function LiveInterviewPage() {
         } catch (err) {
             console.error("Failed to complete interview session", err)
             setPermissionError("Unable to finish the interview. Please try again.")
+            setIsCompleting(false)
         }
     }
 
     const handleNext = async () => {
-        if (isSubmittingAnswer) return
+        if (isSubmittingAnswer || isCompleting) return
         const submitted = await submitCurrentAnswer()
         if (!submitted) return
         const latestSession = await interviewSessionApi.get(sessionId)
@@ -497,7 +481,7 @@ export default function LiveInterviewPage() {
     }
 
     const handleEndInterview = async () => {
-        if (isSubmittingAnswer) return
+        if (isSubmittingAnswer || isCompleting) return
         const submitted = await submitCurrentAnswer()
         if (!submitted) return
         await completeInterviewSession()
@@ -820,25 +804,49 @@ export default function LiveInterviewPage() {
                             </button>
                             <button
                                 onClick={handleEndInterview}
-                                disabled={isSubmittingAnswer}
-                                className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl font-semibold transition-all ${isSubmittingAnswer ? 'bg-red-300 text-white cursor-not-allowed' : 'bg-red-500 text-white hover:bg-red-600'}`}
+                                disabled={isSubmittingAnswer || isCompleting}
+                                className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl font-semibold transition-all ${(isSubmittingAnswer || isCompleting) ? 'bg-red-300 text-white cursor-not-allowed' : 'bg-red-500 text-white hover:bg-red-600'}`}
                             >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                                End Interview
+                                {isCompleting ? (
+                                    <>
+                                        <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        Finishing...
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                        End Interview
+                                    </>
+                                )}
                             </button>
                         </div>
 
                         <button
                             onClick={handleNext}
-                            disabled={isSubmittingAnswer}
-                            className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold transition-all ${isSubmittingAnswer ? 'bg-primary/50 cursor-not-allowed' : 'bg-primary text-white hover:bg-primary-dark'}`}
+                            disabled={isSubmittingAnswer || isCompleting}
+                            className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold transition-all ${(isSubmittingAnswer || isCompleting) ? 'bg-primary/50 cursor-not-allowed' : 'bg-primary text-white hover:bg-primary-dark'}`}
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                            </svg>
-                            Next Question
+                            {isSubmittingAnswer ? (
+                                <>
+                                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Submitting...
+                                </>
+                            ) : (
+                                <>
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                    </svg>
+                                    Next Question
+                                </>
+                            )}
                         </button>
 
                         {/* Quick Tip */}
