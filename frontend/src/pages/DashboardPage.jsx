@@ -122,8 +122,61 @@ export default function DashboardPage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-[#f8fafc] text-slate-500">
-                Loading dashboard insights...
+            <div className="bg-[#f8fafc] min-h-screen font-display">
+                <div className="max-w-7xl mx-auto px-6 lg:px-8 py-8 space-y-8 animate-pulse">
+                    {/* Skeleton Overview Card */}
+                    <div className="flex flex-col md:flex-row overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm h-[300px]">
+                        <div className="md:w-1/4 bg-slate-200" />
+                        <div className="flex flex-col gap-4 p-10 flex-1">
+                            <div className="h-4 bg-slate-200 rounded w-24" />
+                            <div className="h-10 bg-slate-200 rounded w-1/2" />
+                            <div className="h-6 bg-slate-200 rounded w-3/4 mt-4" />
+                            <div className="flex gap-6 mt-6">
+                                <div className="h-6 bg-slate-200 rounded w-32" />
+                                <div className="h-6 bg-slate-200 rounded w-32" />
+                                <div className="h-6 bg-slate-200 rounded w-32" />
+                            </div>
+                            <div className="flex gap-4 mt-8">
+                                <div className="h-12 bg-slate-200 rounded-xl w-40" />
+                                <div className="h-12 bg-slate-200 rounded-xl w-40" />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Skeleton 4 Grid Cards */}
+                    <div className="grid md:grid-cols-4 gap-6">
+                        {[1, 2, 3, 4].map((i) => (
+                            <div key={i} className="rounded-2xl bg-white border border-slate-200 p-6 shadow-sm flex items-center gap-4 h-24">
+                                <div className="w-12 h-12 rounded-xl bg-slate-200" />
+                                <div className="flex-1">
+                                    <div className="h-3 bg-slate-200 rounded w-20 mb-2" />
+                                    <div className="h-6 bg-slate-200 rounded w-16" />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Skeleton Chart & Side Panels */}
+                    <div className="grid lg:grid-cols-12 gap-8">
+                        <div className="lg:col-span-8 space-y-8">
+                            <div className="rounded-3xl border border-slate-200 bg-white p-10 shadow-sm h-96">
+                                <div className="h-8 bg-slate-200 rounded w-1/3 mb-4" />
+                                <div className="h-4 bg-slate-200 rounded w-1/2 mb-10" />
+                                <div className="h-48 bg-slate-100 rounded-lg w-full" />
+                            </div>
+                        </div>
+                        <div className="lg:col-span-4 space-y-8">
+                            <div className="rounded-3xl bg-slate-200 shadow-xl h-64" />
+                            <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm h-64">
+                                <div className="h-6 bg-slate-200 rounded w-1/2 mb-6" />
+                                <div className="space-y-4">
+                                    <div className="h-16 bg-slate-100 rounded-2xl w-full" />
+                                    <div className="h-16 bg-slate-100 rounded-2xl w-full" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         )
     }

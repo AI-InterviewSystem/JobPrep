@@ -1,39 +1,41 @@
 import { Routes, Route, useLocation, Navigate } from "react-router-dom"
+import { lazy, Suspense } from "react"
 import { storage } from "../services/storage"
 import AnimatedPage from "../components/AnimatedPage"
 import Navbar from "../components/layout/Navbar"
 import Footer from "../components/layout/Footer"
+import GlobalSpinner from "../components/GlobalSpinner"
 
-import LandingPage from "../pages/LandingPage"
-import SignupPage from "../pages/SignupPage"
-import LoginPage from "../pages/LoginPage"
-import ProfilePage from "../pages/ProfilePage"
-import ForgotPasswordPage from "../pages/ForgotPasswordPage"
-import ResetPasswordPage from "../pages/ResetPasswordPage"
-import GoogleCallback from "../pages/GoogleCallback"
-import PricingPage from "../pages/PricingPage"
-import DashboardPage from "../pages/DashboardPage"
-import NotificationsPage from "../pages/NotificationsPage"
-import InterviewSetupPage from "../pages/InterviewSetupPage"
-import LiveInterviewPage from "../pages/LiveInterviewPage"
-import InterviewResultPage from "../pages/InterviewResultPage"
-import InterviewHistoryPage from "../pages/InterviewHistoryPage"
-import QuestionBankPage from "../pages/QuestionBankPage"
-import OtpPage from "../pages/OtpPage"
-import AdminDashboard from "../pages/AdminDashboard"
-import AdminUsersPage from "../pages/AdminUsersPage"
-import AdminInterviewSessionsPage from "../pages/AdminInterviewSessionsPage"
-import AdminReportsPage from "../pages/AdminReportsPage"
-import AdminPricingPlansPage from "../pages/AdminPricingPlansPage"
-import AdminPromosPage from "../pages/AdminPromosPage"
-import AdminExperienceLevelsPage from "../pages/AdminExperienceLevelsPage"
-import AdminJobsPage from "../pages/AdminJobsPage"
-import AdminQuestionBankPage from "../pages/AdminQuestionBankPage"
-import CheckoutPage from "../pages/CheckoutPage"
-import AdminLayout from "../layouts/AdminLayout"
-import PaymentResultPage from "../pages/PaymentResultPage"
-import UserFeedbackPage from "../pages/UserFeedbackPage"
-import AdminFeedbackPage from "../pages/AdminFeedbackPage"
+const LandingPage = lazy(() => import("../pages/LandingPage"))
+const SignupPage = lazy(() => import("../pages/SignupPage"))
+const LoginPage = lazy(() => import("../pages/LoginPage"))
+const ProfilePage = lazy(() => import("../pages/ProfilePage"))
+const ForgotPasswordPage = lazy(() => import("../pages/ForgotPasswordPage"))
+const ResetPasswordPage = lazy(() => import("../pages/ResetPasswordPage"))
+const GoogleCallback = lazy(() => import("../pages/GoogleCallback"))
+const PricingPage = lazy(() => import("../pages/PricingPage"))
+const DashboardPage = lazy(() => import("../pages/DashboardPage"))
+const NotificationsPage = lazy(() => import("../pages/NotificationsPage"))
+const InterviewSetupPage = lazy(() => import("../pages/InterviewSetupPage"))
+const LiveInterviewPage = lazy(() => import("../pages/LiveInterviewPage"))
+const InterviewResultPage = lazy(() => import("../pages/InterviewResultPage"))
+const InterviewHistoryPage = lazy(() => import("../pages/InterviewHistoryPage"))
+const QuestionBankPage = lazy(() => import("../pages/QuestionBankPage"))
+const OtpPage = lazy(() => import("../pages/OtpPage"))
+const AdminDashboard = lazy(() => import("../pages/AdminDashboard"))
+const AdminUsersPage = lazy(() => import("../pages/AdminUsersPage"))
+const AdminInterviewSessionsPage = lazy(() => import("../pages/AdminInterviewSessionsPage"))
+const AdminReportsPage = lazy(() => import("../pages/AdminReportsPage"))
+const AdminPricingPlansPage = lazy(() => import("../pages/AdminPricingPlansPage"))
+const AdminPromosPage = lazy(() => import("../pages/AdminPromosPage"))
+const AdminExperienceLevelsPage = lazy(() => import("../pages/AdminExperienceLevelsPage"))
+const AdminJobsPage = lazy(() => import("../pages/AdminJobsPage"))
+const AdminQuestionBankPage = lazy(() => import("../pages/AdminQuestionBankPage"))
+const CheckoutPage = lazy(() => import("../pages/CheckoutPage"))
+const AdminLayout = lazy(() => import("../layouts/AdminLayout"))
+const PaymentResultPage = lazy(() => import("../pages/PaymentResultPage"))
+const UserFeedbackPage = lazy(() => import("../pages/UserFeedbackPage"))
+const AdminFeedbackPage = lazy(() => import("../pages/AdminFeedbackPage"))
 
 const ProtectedRoute = ({ children }) => {
     const token = storage.getToken()
@@ -59,8 +61,9 @@ export default function AppRoutes() {
         <div className="flex flex-col min-h-screen bg-gray-50">
             {!isAdminRoute && <Navbar />}
             <div className="flex-1">
-                <Routes>
-                    <Route path="/" element={<LandingPage />} />
+                <Suspense fallback={<GlobalSpinner />}>
+                    <Routes>
+                        <Route path="/" element={<LandingPage />} />
                     <Route path="/signup" element={<SignupPage />} />
                     <Route path="/login" element={<LoginPage />} />
                     <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -154,6 +157,7 @@ export default function AppRoutes() {
                     <Route path="/payment/success" element={<PaymentResultPage status="success" />} />
                     <Route path="/payment/cancel" element={<PaymentResultPage status="cancel" />} />
                 </Routes>
+                </Suspense>
             </div>
             {!isAdminRoute && <Footer />}
         </div>
