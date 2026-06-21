@@ -30,6 +30,12 @@ export default function AdminQuestionBankPage() {
     const [formData, setFormData] = useState(initialForm);
     const [importText, setImportText] = useState('');
 
+    // Pagination states
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalElements, setTotalElements] = useState(0);
+    const pageSize = 10;
+
     const filteredRoles = useMemo(() => {
         return formData.jobCategoryId
             ? roles.filter(role => role.jobCategoryId === formData.jobCategoryId)
@@ -42,7 +48,7 @@ export default function AdminQuestionBankPage() {
 
     useEffect(() => {
         fetchQuestions();
-    }, [filters]);
+    }, [filters, currentPage]);
 
     const fetchBootstrap = async () => {
         try {
@@ -65,9 +71,16 @@ export default function AdminQuestionBankPage() {
     const fetchQuestions = async () => {
         try {
             setLoading(true);
-            const params = Object.fromEntries(Object.entries(filters).filter(([, value]) => value !== ''));
+            const params = {
+                ...Object.fromEntries(Object.entries(filters).filter(([, value]) => value !== '')),
+                page: currentPage - 1,
+                size: pageSize
+            };
             const response = await adminQuestionBankApi.getAll(params);
-            setQuestions(response.data);
+            const data = response.data;
+            setQuestions(data.questions || []);
+            setTotalPages(data.totalPages || 1);
+            setTotalElements(data.totalElements || 0);
         } catch (error) {
             toast.error('Failed to load questions');
             console.error(error);
@@ -177,49 +190,52 @@ export default function AdminQuestionBankPage() {
         }
     };
 
-    const resetFilters = () => setFilters({ categoryId: '', roleId: '', difficulty: '', questionType: '', isActive: '' });
+    const resetFilters = () => {
+        setFilters({ categoryId: '', roleId: '', difficulty: '', questionType: '', isActive: '' });
+        setCurrentPage(1);
+    };
 
     return (
         <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-100">
             <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
                 <div></div>
                 <div className="flex gap-2">
-                    <button onClick={() => setImportModal(true)} className="border border-gray-200 text-gray-700 px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-slate-50">
+                    <button onClick={() => setImportModal(true)} className="border border-gray-200 text-gray-700 px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-slate-50 cursor-pointer">
                         <FiUpload /> Import
                     </button>
-                    <button onClick={() => openModal()} className="bg-primary text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-primary-dark">
+                    <button onClick={() => openModal()} className="bg-primary text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-primary-dark cursor-pointer">
                         <FiPlus /> Add Question
                     </button>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-6">
-                <select value={filters.categoryId} onChange={(e) => setFilters(prev => ({ ...prev, categoryId: e.target.value, roleId: '' }))} className="px-4 py-2 border border-gray-200 rounded-xl outline-none">
+                <select value={filters.categoryId} onChange={(e) => { setFilters(prev => ({ ...prev, categoryId: e.target.value, roleId: '' })); setCurrentPage(1); }} className="px-4 py-2 border border-gray-200 rounded-xl outline-none">
                     <option value="">All categories</option>
                     {categories.map(category => <option key={category.id} value={category.id}>{category.jobGroupName} / {category.name}</option>)}
                 </select>
-                <select value={filters.roleId} onChange={(e) => setFilters(prev => ({ ...prev, roleId: e.target.value }))} className="px-4 py-2 border border-gray-200 rounded-xl outline-none">
+                <select value={filters.roleId} onChange={(e) => { setFilters(prev => ({ ...prev, roleId: e.target.value })); setCurrentPage(1); }} className="px-4 py-2 border border-gray-200 rounded-xl outline-none">
                     <option value="">All roles</option>
                     {roles.filter(role => !filters.categoryId || role.jobCategoryId === filters.categoryId).map(role => <option key={role.id} value={role.id}>{role.name}</option>)}
                 </select>
-                <select value={filters.difficulty} onChange={(e) => setFilters(prev => ({ ...prev, difficulty: e.target.value }))} className="px-4 py-2 border border-gray-200 rounded-xl outline-none">
+                <select value={filters.difficulty} onChange={(e) => { setFilters(prev => ({ ...prev, difficulty: e.target.value })); setCurrentPage(1); }} className="px-4 py-2 border border-gray-200 rounded-xl outline-none">
                     <option value="">All levels</option>
                     {levels.map(level => (
                         <option key={level.id} value={level.code}>{level.name}</option>
                     ))}
                 </select>
-                <select value={filters.questionType} onChange={(e) => setFilters(prev => ({ ...prev, questionType: e.target.value }))} className="px-4 py-2 border border-gray-200 rounded-xl outline-none">
+                <select value={filters.questionType} onChange={(e) => { setFilters(prev => ({ ...prev, questionType: e.target.value })); setCurrentPage(1); }} className="px-4 py-2 border border-gray-200 rounded-xl outline-none">
                     <option value="">All types</option>
                     <option value="HR">HR</option>
                     <option value="Technical">Technical</option>
                 </select>
                 <div className="flex gap-2">
-                    <select value={filters.isActive} onChange={(e) => setFilters(prev => ({ ...prev, isActive: e.target.value }))} className="min-w-0 flex-1 px-4 py-2 border border-gray-200 rounded-xl outline-none">
+                    <select value={filters.isActive} onChange={(e) => { setFilters(prev => ({ ...prev, isActive: e.target.value })); setCurrentPage(1); }} className="min-w-0 flex-1 px-4 py-2 border border-gray-200 rounded-xl outline-none">
                         <option value="">All status</option>
                         <option value="true">Active</option>
                         <option value="false">Inactive</option>
                     </select>
-                    <button onClick={resetFilters} className="p-2.5 border border-gray-200 rounded-xl text-gray-500 hover:bg-slate-50" title="Reset filters"><FiRefreshCw /></button>
+                    <button onClick={resetFilters} className="p-2.5 border border-gray-200 rounded-xl text-gray-500 hover:bg-slate-50 cursor-pointer" title="Reset filters"><FiRefreshCw /></button>
                 </div>
             </div>
 
@@ -273,14 +289,14 @@ export default function AdminQuestionBankPage() {
                                 <td className="py-4 pr-3 align-top text-gray-600 whitespace-nowrap">{question.suggestedDuration || 120}s</td>
                                 <td className="py-4 pr-3 align-top text-gray-600 truncate">{question.createdByName || question.createdByEmail || '-'}</td>
                                 <td className="py-4 pr-3 align-top">
-                                    <button onClick={() => toggleActive(question)} className={`px-3 py-1 rounded-full text-xs font-medium ${question.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                    <button onClick={() => toggleActive(question)} className={`px-3 py-1 rounded-full text-xs font-medium cursor-pointer ${question.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                                         {question.isActive ? 'Active' : 'Inactive'}
                                     </button>
                                 </td>
                                 <td className="py-4 pr-4 align-top">
                                     <div className="flex justify-end gap-2 whitespace-nowrap">
-                                        <button onClick={() => openModal(question)} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg"><FiEdit2 /></button>
-                                        <button onClick={() => setDeleteModal({ open: true, id: question.id })} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><FiTrash2 /></button>
+                                        <button onClick={() => openModal(question)} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg cursor-pointer"><FiEdit2 /></button>
+                                        <button onClick={() => setDeleteModal({ open: true, id: question.id })} className="p-2 text-red-500 hover:bg-red-50 rounded-lg cursor-pointer"><FiTrash2 /></button>
                                     </div>
                                 </td>
                             </tr>
@@ -291,6 +307,57 @@ export default function AdminQuestionBankPage() {
                     </tbody>
                 </table>
             </div>
+
+            {/* Pagination Controls */}
+            {!loading && totalElements > 0 && (
+                <div className="flex flex-wrap items-center justify-between border-t border-gray-100 px-6 py-4 bg-slate-50/50 -mx-6 -mb-6 rounded-b-2xl mt-6">
+                    <div className="text-sm text-gray-500 mb-2 sm:mb-0">
+                        Showing <span className="font-semibold text-gray-800">{((currentPage - 1) * pageSize) + 1}</span> to{' '}
+                        <span className="font-semibold text-gray-800">
+                            {Math.min(currentPage * pageSize, totalElements)}
+                        </span>{' '}
+                        of <span className="font-semibold text-gray-800">{totalElements}</span> questions
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                            disabled={currentPage === 1}
+                            className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-600 hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-white cursor-pointer disabled:cursor-not-allowed transition-colors"
+                        >
+                            Previous
+                        </button>
+                        
+                        {Array.from({ length: totalPages }, (_, i) => i + 1)
+                            .filter(page => page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1)
+                            .map((page, index, array) => {
+                                const showEllipsis = index > 0 && page - array[index - 1] > 1;
+                                return (
+                                    <React.Fragment key={page}>
+                                        {showEllipsis && <span className="px-2 text-gray-400 text-sm">...</span>}
+                                        <button
+                                            onClick={() => setCurrentPage(page)}
+                                            className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors cursor-pointer ${
+                                                currentPage === page
+                                                    ? 'bg-primary text-white'
+                                                    : 'border border-gray-200 bg-white text-gray-600 hover:bg-slate-50'
+                                            }`}
+                                        >
+                                            {page}
+                                        </button>
+                                    </React.Fragment>
+                                );
+                            })}
+
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                            disabled={currentPage === totalPages}
+                            className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-600 hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-white cursor-pointer disabled:cursor-not-allowed transition-colors"
+                        >
+                            Next
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {modal.open && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">

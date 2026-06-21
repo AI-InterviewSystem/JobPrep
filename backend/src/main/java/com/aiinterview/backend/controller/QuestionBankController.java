@@ -1,6 +1,7 @@
 package com.aiinterview.backend.controller;
 
 import com.aiinterview.backend.dto.QuestionBankResponse;
+import com.aiinterview.backend.dto.QuestionBankPageResponse;
 import com.aiinterview.backend.dto.QuestionTopicResponse;
 import com.aiinterview.backend.service.QuestionBankService;
 import lombok.RequiredArgsConstructor;
@@ -17,13 +18,16 @@ public class QuestionBankController {
     private final QuestionBankService questionBankService;
 
     @GetMapping
-    public ResponseEntity<List<QuestionBankResponse>> getQuestions(
+    public ResponseEntity<QuestionBankPageResponse> getQuestions(
             @RequestParam(required = false) String role,
             @RequestParam(required = false) String level,
             @RequestParam(required = false) Integer topicId,
             @RequestParam(required = false) String questionType,
-            @RequestParam(required = false) Boolean bookmarked) {
-        return ResponseEntity.ok(questionBankService.getUserQuestions(role, level, topicId, questionType, bookmarked));
+            @RequestParam(required = false) Boolean bookmarked,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(questionBankService.getUserQuestions(role, level, topicId, questionType, bookmarked, keyword, page, size));
     }
 
     @GetMapping("/{id}")
@@ -50,5 +54,10 @@ public class QuestionBankController {
     @GetMapping("/topics")
     public ResponseEntity<List<QuestionTopicResponse>> getTopics() {
         return ResponseEntity.ok(questionBankService.getActiveTopics());
+    }
+
+    @GetMapping("/roles")
+    public ResponseEntity<List<String>> getRoles() {
+        return ResponseEntity.ok(questionBankService.getActiveRoles());
     }
 }

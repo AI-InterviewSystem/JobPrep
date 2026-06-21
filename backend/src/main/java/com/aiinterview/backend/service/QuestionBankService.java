@@ -2,6 +2,7 @@ package com.aiinterview.backend.service;
 
 import com.aiinterview.backend.dto.QuestionBankRequest;
 import com.aiinterview.backend.dto.QuestionBankResponse;
+import com.aiinterview.backend.dto.QuestionBankPageResponse;
 import com.aiinterview.backend.entity.JobCategory;
 import com.aiinterview.backend.entity.JobGroup;
 import com.aiinterview.backend.entity.JobRole;
@@ -24,6 +25,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -64,6 +68,35 @@ public class QuestionBankService {
     }
 
     @Transactional(readOnly = true)
+    public QuestionBankPageResponse getQuestions(UUID categoryId, UUID roleId, String difficulty, String questionType, Boolean isActive, int page, int size) {
+        Specification<QuestionBank> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.isNull(root.get("deletedAt")));
+            if (categoryId != null) predicates.add(cb.equal(root.get("jobCategory").get("id"), categoryId));
+            if (roleId != null) predicates.add(cb.equal(root.get("jobRole").get("id"), roleId));
+            if (difficulty != null && !difficulty.isBlank()) predicates.add(cb.equal(cb.lower(root.get("difficulty")), difficulty.toLowerCase()));
+            if (questionType != null && !questionType.isBlank()) predicates.add(cb.equal(cb.lower(root.get("questionType")), questionType.toLowerCase()));
+            if (isActive != null) predicates.add(cb.equal(root.get("isActive"), isActive));
+            query.orderBy(cb.desc(root.get("updatedAt")), cb.desc(root.get("id")));
+            return cb.and(predicates.toArray(Predicate[]::new));
+        };
+
+        Pageable pageable = PageRequest.of(page, size);
+        Page<QuestionBank> questionPage = questionBankRepository.findAll(spec, pageable);
+        List<QuestionBankResponse> list = questionPage.getContent().stream()
+                .map(question -> mapQuestion(question, false, false))
+                .toList();
+
+        return QuestionBankPageResponse.builder()
+                .questions(list)
+                .page(page)
+                .size(size)
+                .totalElements(questionPage.getTotalElements())
+                .totalPages(questionPage.getTotalPages())
+                .build();
+    }
+
+    @Transactional(readOnly = true)
     public List<QuestionBankResponse> getUserQuestions(String role, String level, Integer topicId, String questionType, Boolean bookmarkedOnly) {
         User user = getCurrentUser();
         Specification<QuestionBank> spec = (root, query, cb) -> {
@@ -100,6 +133,78 @@ public class QuestionBankService {
                 .filter(question -> !Boolean.TRUE.equals(bookmarkedOnly) || bookmarkedIds.contains(question.getId()))
                 .map(question -> mapQuestion(question, bookmarkedIds.contains(question.getId()), practicedIds.contains(question.getId())))
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public QuestionBankPageResponse getUserQuestions(String role, String level, Integer topicId, String questionType, Boolean bookmarkedOnly, String keyword, int page, int size) {
+        User user = getCurrentUser();
+        Specification<QuestionBank> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.isNull(root.get("deletedAt")));
+            predicates.add(cb.isTrue(root.get("isActive")));
+            if (role != null && !role.isBlank()) {
+                var roleJoin = root.join("jobRole", JoinType.LEFT);
+                String value = role.toLowerCase();
+                predicates.add(cb.or(
+                        cb.equal(cb.lower(root.get("role")), value),
+                        cb.equal(cb.lower(roleJoin.get("name")), value)
+                ));
+            }
+            if (level != null && !level.isBlank()) {
+                String value = level.toLowerCase();
+                predicates.add(cb.or(
+                        cb.equal(cb.lower(root.get("level")), value),
+                        cb.equal(cb.lower(root.get("difficulty")), value)
+                ));
+            }
+            if (topicId != null) predicates.add(cb.equal(root.get("topic").get("id"), topicId));
+            if (questionType != null && !questionType.isBlank()) {
+                predicates.add(cb.equal(cb.lower(root.get("questionType")), questionType.toLowerCase()));
+            }
+            if (Boolean.TRUE.equals(bookmarkedOnly)) {
+                List<Integer> bookmarkedIds = questionBookmarkRepository.findAllByUserIdOrderByCreatedAtDesc(user.getId()).stream()
+                        .map(bookmark -> bookmark.getQuestion().getId())
+                        .toList();
+                if (bookmarkedIds.isEmpty()) {
+                    return cb.or(cb.disjunction());
+                }
+                predicates.add(root.get("id").in(bookmarkedIds));
+            }
+            if (keyword != null && !keyword.isBlank()) {
+                String val = "%" + keyword.trim().toLowerCase() + "%";
+                var roleJoin = root.join("jobRole", JoinType.LEFT);
+                var topicJoin = root.join("topic", JoinType.LEFT);
+                var catJoin = root.join("jobCategory", JoinType.LEFT);
+                predicates.add(cb.or(
+                        cb.like(cb.lower(root.get("questionText")), val),
+                        cb.like(cb.lower(root.get("role")), val),
+                        cb.like(cb.lower(root.get("level")), val),
+                        cb.like(cb.lower(roleJoin.get("name")), val),
+                        cb.like(cb.lower(topicJoin.get("name")), val),
+                        cb.like(cb.lower(catJoin.get("name")), val)
+                ));
+            }
+            query.orderBy(cb.desc(root.get("updatedAt")), cb.desc(root.get("id")));
+            return cb.and(predicates.toArray(Predicate[]::new));
+        };
+
+        Pageable pageable = PageRequest.of(page, size);
+        Page<QuestionBank> questionPage = questionBankRepository.findAll(spec, pageable);
+        List<Integer> questionIds = questionPage.getContent().stream().map(QuestionBank::getId).toList();
+        Set<Integer> bookmarkedIds = getBookmarkedIds(user, questionIds);
+        Set<Integer> practicedIds = getPracticedIds(user, questionIds);
+
+        List<QuestionBankResponse> list = questionPage.getContent().stream()
+                .map(question -> mapQuestion(question, bookmarkedIds.contains(question.getId()), practicedIds.contains(question.getId())))
+                .toList();
+
+        return QuestionBankPageResponse.builder()
+                .questions(list)
+                .page(page)
+                .size(size)
+                .totalElements(questionPage.getTotalElements())
+                .totalPages(questionPage.getTotalPages())
+                .build();
     }
 
     @Transactional(readOnly = true)
@@ -151,6 +256,15 @@ public class QuestionBankService {
                         .name(topic.getName())
                         .description(topic.getDescription())
                         .build())
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> getActiveRoles() {
+        return jobRoleRepository.findAllActiveOrNullOrderByNameAsc().stream()
+                .map(JobRole::getName)
+                .map(String::trim)
+                .distinct()
                 .toList();
     }
 

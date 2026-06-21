@@ -18,6 +18,7 @@ export default function QuestionBankPage() {
     const [questions, setQuestions] = useState([]);
     const [topics, setTopics] = useState([]);
     const [levels, setLevels] = useState([]);
+    const [roles, setRoles] = useState([]);
     const [selectedQuestion, setSelectedQuestion] = useState(null);
     const [loading, setLoading] = useState(true);
     const [detailLoading, setDetailLoading] = useState(false);
@@ -38,6 +39,12 @@ export default function QuestionBankPage() {
     const [subscription, setSubscription] = useState(null);
     const [practiceLimitReached, setPracticeLimitReached] = useState(false);
 
+    // Pagination states
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalElements, setTotalElements] = useState(0);
+    const pageSize = 10;
+
     useEffect(() => {
         fetchBootstrap();
     }, []);
@@ -46,42 +53,27 @@ export default function QuestionBankPage() {
         const topicId = searchParams.get('topicId');
         if (topicId) {
             setFilters(prev => ({ ...prev, topicId }));
+            setCurrentPage(1);
         }
     }, [searchParams]);
 
     useEffect(() => {
         fetchQuestions();
-    }, [filters.role, filters.level, filters.topicId, filters.questionType, showBookmarks]);
+    }, [currentPage, filters.role, filters.level, filters.topicId, filters.questionType, filters.keyword, showBookmarks]);
 
-    const roles = useMemo(() => {
-        const values = questions.map(question => question.role || question.jobRoleName).filter(Boolean);
-        return [...new Set(values)].sort();
-    }, [questions]);
-
-    const visibleQuestions = useMemo(() => {
-        const keyword = filters.keyword.trim().toLowerCase();
-        if (!keyword) return questions;
-        return questions.filter(question => {
-            const haystack = [
-                question.questionText,
-                question.topicName,
-                question.role,
-                question.level,
-                ...(question.tags || [])
-            ].filter(Boolean).join(' ').toLowerCase();
-            return haystack.includes(keyword);
-        });
-    }, [questions, filters.keyword]);
+    const visibleQuestions = questions;
 
     const fetchBootstrap = async () => {
         try {
-            const [topicRes, levelRes, subRes] = await Promise.all([
+            const [topicRes, levelRes, subRes, roleRes] = await Promise.all([
                 questionBankApi.getTopics(),
                 experienceLevelsApi.getActive(),
                 paymentApi.getCurrentSubscription(),
+                questionBankApi.getRoles(),
             ]);
             setTopics(topicRes.data);
             setLevels(levelRes.data);
+            setRoles(roleRes.data || []);
 
             const sub = subRes.data;
             setSubscription(sub);
@@ -103,12 +95,15 @@ export default function QuestionBankPage() {
                 topicId: filters.topicId || undefined,
                 questionType: filters.questionType || undefined,
                 bookmarked: showBookmarks || undefined,
+                keyword: filters.keyword.trim() || undefined,
+                page: currentPage - 1,
+                size: pageSize
             };
             const response = await questionBankApi.list(params);
-            setQuestions(response.data);
-            if (selectedQuestion && !response.data.some(question => question.id === selectedQuestion.id)) {
-                setSelectedQuestion(null);
-            }
+            const data = response.data;
+            setQuestions(data.questions || []);
+            setTotalPages(data.totalPages || 1);
+            setTotalElements(data.totalElements || 0);
         } catch (error) {
             toast.error('Failed to load questions');
             console.error(error);
@@ -284,13 +279,19 @@ export default function QuestionBankPage() {
                         <FiPlay /> Start Topic Practice
                     </button>
                     <button
-                        onClick={() => setShowBookmarks(false)}
+                        onClick={() => {
+                            setShowBookmarks(false);
+                            setCurrentPage(1);
+                        }}
                         className={`rounded-xl px-4 py-2 text-sm font-semibold ${!showBookmarks ? 'bg-primary text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
                     >
                         All Questions
                     </button>
                     <button
-                        onClick={() => setShowBookmarks(true)}
+                        onClick={() => {
+                            setShowBookmarks(true);
+                            setCurrentPage(1);
+                        }}
                         className={`rounded-xl px-4 py-2 text-sm font-semibold ${showBookmarks ? 'bg-primary text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
                     >
                         Bookmarked
@@ -303,25 +304,28 @@ export default function QuestionBankPage() {
                     <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input
                         value={filters.keyword}
-                        onChange={(e) => setFilters(prev => ({ ...prev, keyword: e.target.value }))}
+                        onChange={(e) => {
+                            setFilters(prev => ({ ...prev, keyword: e.target.value }));
+                            setCurrentPage(1);
+                        }}
                         placeholder="Search question, tag, topic"
                         className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-3 outline-none focus:border-primary"
                     />
                 </div>
-                <select value={filters.role} onChange={(e) => setFilters(prev => ({ ...prev, role: e.target.value }))} className="rounded-xl border border-gray-200 px-3 py-2.5 outline-none focus:border-primary">
+                <select value={filters.role} onChange={(e) => { setFilters(prev => ({ ...prev, role: e.target.value })); setCurrentPage(1); }} className="rounded-xl border border-gray-200 px-3 py-2.5 outline-none focus:border-primary">
                     <option value="">All roles</option>
                     {roles.map(role => <option key={role} value={role}>{role}</option>)}
                 </select>
-                <select value={filters.level} onChange={(e) => setFilters(prev => ({ ...prev, level: e.target.value }))} className="rounded-xl border border-gray-200 px-3 py-2.5 outline-none focus:border-primary">
+                <select value={filters.level} onChange={(e) => { setFilters(prev => ({ ...prev, level: e.target.value })); setCurrentPage(1); }} className="rounded-xl border border-gray-200 px-3 py-2.5 outline-none focus:border-primary">
                     <option value="">All levels</option>
                     {levels.map(level => <option key={level.id} value={level.code}>{level.name}</option>)}
                 </select>
-                <select value={filters.topicId} onChange={(e) => setFilters(prev => ({ ...prev, topicId: e.target.value }))} className="rounded-xl border border-gray-200 px-3 py-2.5 outline-none focus:border-primary">
+                <select value={filters.topicId} onChange={(e) => { setFilters(prev => ({ ...prev, topicId: e.target.value })); setCurrentPage(1); }} className="rounded-xl border border-gray-200 px-3 py-2.5 outline-none focus:border-primary">
                     <option value="">All topics</option>
                     {topics.map(topic => <option key={topic.id} value={topic.id}>{topic.name}</option>)}
                 </select>
                 <div className="flex gap-2">
-                    <select value={filters.questionType} onChange={(e) => setFilters(prev => ({ ...prev, questionType: e.target.value }))} className="min-w-0 flex-1 rounded-xl border border-gray-200 px-3 py-2.5 outline-none focus:border-primary">
+                    <select value={filters.questionType} onChange={(e) => { setFilters(prev => ({ ...prev, questionType: e.target.value })); setCurrentPage(1); }} className="min-w-0 flex-1 rounded-xl border border-gray-200 px-3 py-2.5 outline-none focus:border-primary">
                         {typeOptions.map(type => <option key={type.value} value={type.value}>{type.label}</option>)}
                     </select>
                     <button onClick={resetFilters} className="rounded-xl border border-gray-200 p-3 text-gray-500 hover:bg-slate-50" title="Reset filters">
@@ -331,7 +335,7 @@ export default function QuestionBankPage() {
             </section>
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
-                <section className="rounded-2xl border border-slate-100 bg-white shadow-sm">
+                <section className="rounded-2xl border border-slate-100 bg-white shadow-sm flex flex-col justify-between overflow-hidden">
                     {loading ? (
                         <div className="flex h-64 items-center justify-center">
                             <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-primary"></div>
@@ -343,33 +347,84 @@ export default function QuestionBankPage() {
                             <p className="text-sm">Try changing role, level, topic, or bookmark filters.</p>
                         </div>
                     ) : (
-                        <div className="divide-y divide-gray-100">
-                            {visibleQuestions.map(question => (
-                                <article key={question.id} className="flex gap-4 p-5 hover:bg-slate-50">
-                                    <button onClick={() => openQuestion(question)} className="min-w-0 flex-1 text-left">
-                                        <p className="mb-3 line-clamp-2 text-base font-bold text-gray-900">{question.questionText}</p>
-                                        {renderMeta(question)}
-                                        <div className="mt-3 flex flex-wrap gap-1.5">
-                                            {(question.tags || []).slice(0, 5).map(tag => (
-                                                <span key={tag} className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{tag}</span>
-                                            ))}
+                        <>
+                            <div className="divide-y divide-gray-100 flex-1">
+                                {visibleQuestions.map(question => (
+                                    <article key={question.id} className="flex gap-4 p-5 hover:bg-slate-50">
+                                        <button onClick={() => openQuestion(question)} className="min-w-0 flex-1 text-left">
+                                            <p className="mb-3 line-clamp-2 text-base font-bold text-gray-900">{question.questionText}</p>
+                                            {renderMeta(question)}
+                                            <div className="mt-3 flex flex-wrap gap-1.5">
+                                                {(question.tags || []).slice(0, 5).map(tag => (
+                                                    <span key={tag} className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{tag}</span>
+                                                ))}
+                                            </div>
+                                        </button>
+                                        <div className="flex shrink-0 items-start gap-2">
+                                            <button
+                                                onClick={() => toggleBookmark(question)}
+                                                className={`rounded-xl border p-2.5 ${question.bookmarked ? 'border-yellow-200 bg-yellow-50 text-yellow-600' : 'border-gray-200 text-gray-500 hover:bg-white'}`}
+                                                title={question.bookmarked ? 'Remove bookmark' : 'Bookmark'}
+                                            >
+                                                <FiBookmark className={question.bookmarked ? 'fill-current' : ''} />
+                                            </button>
+                                            <button onClick={() => openQuestion(question)} className="rounded-xl border border-gray-200 p-2.5 text-gray-500 hover:bg-white" title="View detail">
+                                                <FiChevronRight />
+                                            </button>
                                         </div>
+                                    </article>
+                                ))}
+                            </div>
+                            
+                            {/* Pagination Controls */}
+                            <div className="flex flex-wrap items-center justify-between border-t border-gray-100 px-6 py-4 bg-slate-50/50">
+                                <div className="text-sm text-gray-500 mb-2 sm:mb-0">
+                                    Showing <span className="font-semibold text-gray-800">{((currentPage - 1) * pageSize) + 1}</span> to{' '}
+                                    <span className="font-semibold text-gray-800">
+                                        {Math.min(currentPage * pageSize, totalElements)}
+                                    </span>{' '}
+                                    of <span className="font-semibold text-gray-800">{totalElements}</span> questions
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <button
+                                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                        disabled={currentPage === 1}
+                                        className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-600 hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-white cursor-pointer disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        Previous
                                     </button>
-                                    <div className="flex shrink-0 items-start gap-2">
-                                        <button
-                                            onClick={() => toggleBookmark(question)}
-                                            className={`rounded-xl border p-2.5 ${question.bookmarked ? 'border-yellow-200 bg-yellow-50 text-yellow-600' : 'border-gray-200 text-gray-500 hover:bg-white'}`}
-                                            title={question.bookmarked ? 'Remove bookmark' : 'Bookmark'}
-                                        >
-                                            <FiBookmark className={question.bookmarked ? 'fill-current' : ''} />
-                                        </button>
-                                        <button onClick={() => openQuestion(question)} className="rounded-xl border border-gray-200 p-2.5 text-gray-500 hover:bg-white" title="View detail">
-                                            <FiChevronRight />
-                                        </button>
-                                    </div>
-                                </article>
-                            ))}
-                        </div>
+                                    
+                                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                        .filter(page => page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1)
+                                        .map((page, index, array) => {
+                                            const showEllipsis = index > 0 && page - array[index - 1] > 1;
+                                            return (
+                                                <React.Fragment key={page}>
+                                                    {showEllipsis && <span className="px-2 text-gray-400 text-sm">...</span>}
+                                                    <button
+                                                        onClick={() => setCurrentPage(page)}
+                                                        className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors cursor-pointer ${
+                                                            currentPage === page
+                                                                ? 'bg-primary text-white'
+                                                                : 'border border-gray-200 bg-white text-gray-600 hover:bg-slate-50'
+                                                        }`}
+                                                    >
+                                                        {page}
+                                                    </button>
+                                                </React.Fragment>
+                                            );
+                                        })}
+
+                                    <button
+                                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                        disabled={currentPage === totalPages}
+                                        className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-600 hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-white cursor-pointer disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        Next
+                                    </button>
+                                </div>
+                            </div>
+                        </>
                     )}
                 </section>
 

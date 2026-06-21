@@ -2,6 +2,7 @@ package com.aiinterview.backend.controller;
 
 import com.aiinterview.backend.dto.QuestionBankRequest;
 import com.aiinterview.backend.dto.QuestionBankResponse;
+import com.aiinterview.backend.dto.QuestionBankPageResponse;
 import com.aiinterview.backend.service.QuestionBankService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -21,13 +22,15 @@ public class AdminQuestionBankController {
     private final QuestionBankService questionBankService;
 
     @GetMapping
-    public ResponseEntity<List<QuestionBankResponse>> getQuestions(
+    public ResponseEntity<QuestionBankPageResponse> getQuestions(
             @RequestParam(required = false) UUID categoryId,
             @RequestParam(required = false) UUID roleId,
             @RequestParam(required = false) String difficulty,
             @RequestParam(required = false) String questionType,
-            @RequestParam(required = false) Boolean isActive) {
-        return ResponseEntity.ok(questionBankService.getQuestions(categoryId, roleId, difficulty, questionType, isActive));
+            @RequestParam(required = false) Boolean isActive,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(questionBankService.getQuestions(categoryId, roleId, difficulty, questionType, isActive, page, size));
     }
 
     @PostMapping
