@@ -148,7 +148,9 @@ public class DatabaseInitialization {
             jdbcTemplate.execute("ALTER TABLE question_bank ADD COLUMN IF NOT EXISTS sample_answer TEXT");
             jdbcTemplate.execute("ALTER TABLE question_bank ADD COLUMN IF NOT EXISTS explanation TEXT");
             jdbcTemplate.execute("ALTER TABLE question_bank ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id)");
+            jdbcTemplate.execute("ALTER TABLE question_bank ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true");
             jdbcTemplate.execute("ALTER TABLE question_bank ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ");
+            jdbcTemplate.execute("UPDATE question_bank SET is_active = true WHERE is_active IS NULL");
             jdbcTemplate.execute("""
                     CREATE TABLE IF NOT EXISTS question_bookmarks (
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
