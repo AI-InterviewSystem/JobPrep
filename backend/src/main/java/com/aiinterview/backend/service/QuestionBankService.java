@@ -102,7 +102,7 @@ public class QuestionBankService {
         Specification<QuestionBank> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             predicates.add(cb.isNull(root.get("deletedAt")));
-            predicates.add(cb.isTrue(root.get("isActive")));
+            predicates.add(cb.or(cb.isTrue(root.get("isActive")), cb.isNull(root.get("isActive"))));
             if (role != null && !role.isBlank()) {
                 var roleJoin = root.join("jobRole", JoinType.LEFT);
                 String value = role.toLowerCase();
@@ -141,7 +141,7 @@ public class QuestionBankService {
         Specification<QuestionBank> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             predicates.add(cb.isNull(root.get("deletedAt")));
-            predicates.add(cb.isTrue(root.get("isActive")));
+            predicates.add(cb.or(cb.isTrue(root.get("isActive")), cb.isNull(root.get("isActive"))));
             if (role != null && !role.isBlank()) {
                 var roleJoin = root.join("jobRole", JoinType.LEFT);
                 String value = role.toLowerCase();
@@ -211,7 +211,7 @@ public class QuestionBankService {
     public QuestionBankResponse getUserQuestionDetail(Integer id) {
         User user = getCurrentUser();
         QuestionBank question = questionBankRepository.findById(id)
-                .filter(q -> q.getDeletedAt() == null && Boolean.TRUE.equals(q.getIsActive()))
+                .filter(this::isVisibleToUser)
                 .orElseThrow(() -> new AppException("Question not found"));
         boolean bookmarked = questionBookmarkRepository.existsByUserIdAndQuestionId(user.getId(), id);
         boolean practiced = practiceAnswerRepository.existsByPracticeSessionUserIdAndQuestionId(user.getId(), id);
@@ -223,7 +223,7 @@ public class QuestionBankService {
         User user = getCurrentUser();
         return questionBookmarkRepository.findAllByUserIdOrderByCreatedAtDesc(user.getId()).stream()
                 .map(QuestionBookmark::getQuestion)
-                .filter(question -> question.getDeletedAt() == null && Boolean.TRUE.equals(question.getIsActive()))
+                .filter(this::isVisibleToUser)
                 .map(question -> mapQuestion(question, true,
                         practiceAnswerRepository.existsByPracticeSessionUserIdAndQuestionId(user.getId(), question.getId())))
                 .toList();
@@ -233,7 +233,7 @@ public class QuestionBankService {
     public QuestionBankResponse bookmarkQuestion(Integer questionId) {
         User user = getCurrentUser();
         QuestionBank question = questionBankRepository.findById(questionId)
-                .filter(q -> q.getDeletedAt() == null && Boolean.TRUE.equals(q.getIsActive()))
+                .filter(this::isVisibleToUser)
                 .orElseThrow(() -> new AppException("Question not found"));
         if (!questionBookmarkRepository.existsByUserIdAndQuestionId(user.getId(), questionId)) {
             questionBookmarkRepository.save(QuestionBookmark.builder().user(user).question(question).build());
@@ -382,6 +382,10 @@ public class QuestionBankService {
         return practiceAnswerRepository.findAllByPracticeSessionUserIdAndQuestionIdIn(user.getId(), questionIds).stream()
                 .map(answer -> answer.getQuestion().getId())
                 .collect(Collectors.toSet());
+    }
+
+    private boolean isVisibleToUser(QuestionBank question) {
+        return question.getDeletedAt() == null && !Boolean.FALSE.equals(question.getIsActive());
     }
 
     private QuestionBankResponse mapQuestion(QuestionBank question, boolean bookmarked, boolean practiced) {
