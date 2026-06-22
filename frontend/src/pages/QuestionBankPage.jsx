@@ -64,25 +64,40 @@ export default function QuestionBankPage() {
     const visibleQuestions = questions;
 
     const fetchBootstrap = async () => {
-        try {
-            const [topicRes, levelRes, subRes, roleRes] = await Promise.all([
-                questionBankApi.getTopics(),
-                experienceLevelsApi.getActive(),
-                paymentApi.getCurrentSubscription(),
-                questionBankApi.getRoles(),
-            ]);
-            setTopics(topicRes.data);
-            setLevels(levelRes.data);
-            setRoles(roleRes.data || []);
+        const skipAuthRedirect = { skipAuthRedirect: true };
+        const [topicRes, levelRes, subRes, roleRes] = await Promise.allSettled([
+            questionBankApi.getTopics(skipAuthRedirect),
+            experienceLevelsApi.getActive(skipAuthRedirect),
+            paymentApi.getCurrentSubscription(skipAuthRedirect),
+            questionBankApi.getRoles(skipAuthRedirect),
+        ]);
 
-            const sub = subRes.data;
+        if (topicRes.status === 'fulfilled') {
+            setTopics(topicRes.value.data || []);
+        } else {
+            console.warn('Failed to load question topics', topicRes.reason);
+        }
+
+        if (levelRes.status === 'fulfilled') {
+            setLevels(levelRes.value.data || []);
+        } else {
+            console.warn('Failed to load experience levels', levelRes.reason);
+        }
+
+        if (roleRes.status === 'fulfilled') {
+            setRoles(roleRes.value.data || []);
+        } else {
+            console.warn('Failed to load question roles', roleRes.reason);
+        }
+
+        if (subRes.status === 'fulfilled') {
+            const sub = subRes.value.data;
             setSubscription(sub);
             if (sub && sub.practiceQuestionsLimit !== -1 && sub.practiceQuestionsUsed >= sub.practiceQuestionsLimit) {
                 setPracticeLimitReached(true);
             }
-        } catch (error) {
-            toast.error('Failed to load question bank');
-            console.error(error);
+        } else {
+            console.warn('Failed to load subscription status', subRes.reason);
         }
     };
 
@@ -99,7 +114,7 @@ export default function QuestionBankPage() {
                 page: currentPage - 1,
                 size: pageSize
             };
-            const response = await questionBankApi.list(params);
+            const response = await questionBankApi.list(params, { skipAuthRedirect: true });
             const data = response.data;
             setQuestions(data.questions || []);
             setTotalPages(data.totalPages || 1);
@@ -115,7 +130,7 @@ export default function QuestionBankPage() {
     const openQuestion = async (question) => {
         try {
             setDetailLoading(true);
-            const response = await questionBankApi.get(question.id);
+            const response = await questionBankApi.get(question.id, { skipAuthRedirect: true });
             setSelectedQuestion(response.data);
             setPracticeAnswer('');
             setPracticeFeedback(null);

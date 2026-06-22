@@ -87,7 +87,7 @@ export const jobDescriptionApi = {
 };
 
 export const experienceLevelsApi = {
-    getActive: () => api.get('/experience-levels'),
+    getActive: (config = {}) => api.get('/experience-levels', config),
 };
 
 export const dashboardApi = {
@@ -106,11 +106,11 @@ export const notificationApi = {
 };
 
 export const questionBankApi = {
-    list: (params) => api.get('/question-bank', { params }),
-    get: (id) => api.get(`/question-bank/${id}`),
-    getTopics: () => api.get('/question-bank/topics'),
-    getRoles: () => api.get('/question-bank/roles'),
-    getBookmarks: () => api.get('/question-bank/bookmarks'),
+    list: (params, config = {}) => api.get('/question-bank', { ...config, params }),
+    get: (id, config = {}) => api.get(`/question-bank/${id}`, config),
+    getTopics: (config = {}) => api.get('/question-bank/topics', config),
+    getRoles: (config = {}) => api.get('/question-bank/roles', config),
+    getBookmarks: (config = {}) => api.get('/question-bank/bookmarks', config),
     bookmark: (id) => api.post(`/question-bank/${id}/bookmark`),
     removeBookmark: (id) => api.delete(`/question-bank/${id}/bookmark`),
     startPractice: (data) => api.post('/question-bank/practice/sessions', data),
@@ -193,7 +193,7 @@ export const paymentApi = {
     getStatus: () => api.get('/payments/status'),
     cancel: () => api.post('/payments/cancel'),
     sync: (orderCode) => api.get(`/payments/sync/${orderCode}`),
-    getCurrentSubscription: () => api.get('/payments/current'),
+    getCurrentSubscription: (config = {}) => api.get('/payments/current', config),
 };
 
 export const promoApi = {
