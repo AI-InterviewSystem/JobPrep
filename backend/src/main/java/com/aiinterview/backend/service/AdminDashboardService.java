@@ -21,6 +21,7 @@ public class AdminDashboardService {
         private final UserRepository userRepository;
         private final PaymentRepository paymentRepository;
         private final JdbcTemplate jdbcTemplate;
+        private final Ga4AnalyticsService ga4AnalyticsService;
 
         public AdminDashboardResponse getDashboardStats() {
                 LocalDateTime now = LocalDateTime.now();
@@ -129,6 +130,7 @@ public class AdminDashboardService {
                                                 .build())
                                 .revenueChart(revenueChart)
                                 .userGrowthChart(userGrowthChart)
+                                .ga4Analytics(ga4AnalyticsService.getAnalytics())
                                 .topProducts(topProducts)
                                 .recentCustomers(recentCustomers)
                                 .build();
@@ -149,3 +151,4 @@ public class AdminDashboardService {
                                 .doubleValue();
         }
 }
+
