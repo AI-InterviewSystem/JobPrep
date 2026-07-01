@@ -22,6 +22,7 @@ import com.aiinterview.backend.repository.UserRepository;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.data.jpa.domain.Specification;
@@ -98,7 +99,7 @@ public class QuestionBankService {
 
     @Transactional(readOnly = true)
     public List<QuestionBankResponse> getUserQuestions(String role, String level, Integer topicId, String questionType, Boolean bookmarkedOnly) {
-        User user = getCurrentUser();
+        User user = getCurrentUserOrNull();
         Specification<QuestionBank> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             predicates.add(cb.isNull(root.get("deletedAt")));
@@ -127,8 +128,8 @@ public class QuestionBankService {
         };
 
         List<QuestionBank> questions = questionBankRepository.findAll(spec);
-        Set<Integer> bookmarkedIds = getBookmarkedIds(user, questions.stream().map(QuestionBank::getId).toList());
-        Set<Integer> practicedIds = getPracticedIds(user, questions.stream().map(QuestionBank::getId).toList());
+        Set<Integer> bookmarkedIds = user != null ? getBookmarkedIds(user, questions.stream().map(QuestionBank::getId).toList()) : Set.of();
+        Set<Integer> practicedIds = user != null ? getPracticedIds(user, questions.stream().map(QuestionBank::getId).toList()) : Set.of();
         return questions.stream()
                 .filter(question -> !Boolean.TRUE.equals(bookmarkedOnly) || bookmarkedIds.contains(question.getId()))
                 .map(question -> mapQuestion(question, bookmarkedIds.contains(question.getId()), practicedIds.contains(question.getId())))
@@ -137,7 +138,7 @@ public class QuestionBankService {
 
     @Transactional(readOnly = true)
     public QuestionBankPageResponse getUserQuestions(String role, String level, Integer topicId, String questionType, Boolean bookmarkedOnly, String keyword, int page, int size) {
-        User user = getCurrentUser();
+        User user = getCurrentUserOrNull();
         Specification<QuestionBank> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             predicates.add(cb.isNull(root.get("deletedAt")));
@@ -162,6 +163,9 @@ public class QuestionBankService {
                 predicates.add(cb.equal(cb.lower(root.get("questionType")), questionType.toLowerCase()));
             }
             if (Boolean.TRUE.equals(bookmarkedOnly)) {
+                if (user == null) {
+                    return cb.disjunction();
+                }
                 List<Integer> bookmarkedIds = questionBookmarkRepository.findAllByUserIdOrderByCreatedAtDesc(user.getId()).stream()
                         .map(bookmark -> bookmark.getQuestion().getId())
                         .toList();
@@ -191,8 +195,8 @@ public class QuestionBankService {
         Pageable pageable = PageRequest.of(page, size);
         Page<QuestionBank> questionPage = questionBankRepository.findAll(spec, pageable);
         List<Integer> questionIds = questionPage.getContent().stream().map(QuestionBank::getId).toList();
-        Set<Integer> bookmarkedIds = getBookmarkedIds(user, questionIds);
-        Set<Integer> practicedIds = getPracticedIds(user, questionIds);
+        Set<Integer> bookmarkedIds = user != null ? getBookmarkedIds(user, questionIds) : Set.of();
+        Set<Integer> practicedIds = user != null ? getPracticedIds(user, questionIds) : Set.of();
 
         List<QuestionBankResponse> list = questionPage.getContent().stream()
                 .map(question -> mapQuestion(question, bookmarkedIds.contains(question.getId()), practicedIds.contains(question.getId())))
@@ -209,12 +213,12 @@ public class QuestionBankService {
 
     @Transactional(readOnly = true)
     public QuestionBankResponse getUserQuestionDetail(Integer id) {
-        User user = getCurrentUser();
+        User user = getCurrentUserOrNull();
         QuestionBank question = questionBankRepository.findById(id)
                 .filter(this::isVisibleToUser)
                 .orElseThrow(() -> new AppException("Question not found"));
-        boolean bookmarked = questionBookmarkRepository.existsByUserIdAndQuestionId(user.getId(), id);
-        boolean practiced = practiceAnswerRepository.existsByPracticeSessionUserIdAndQuestionId(user.getId(), id);
+        boolean bookmarked = user != null && questionBookmarkRepository.existsByUserIdAndQuestionId(user.getId(), id);
+        boolean practiced = user != null && practiceAnswerRepository.existsByPracticeSessionUserIdAndQuestionId(user.getId(), id);
         return mapQuestion(question, bookmarked, practiced);
     }
 
@@ -363,22 +367,30 @@ public class QuestionBankService {
     }
 
     private User getCurrentUser() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated()) {
+        User user = getCurrentUserOrNull();
+        if (user == null) {
             throw new AppException("Authentication required");
         }
-        return userRepository.findByEmail(auth.getName()).orElseThrow(() -> new AppException("User not found"));
+        return user;
+    }
+
+    private User getCurrentUserOrNull() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || auth instanceof AnonymousAuthenticationToken) {
+            return null;
+        }
+        return userRepository.findByEmail(auth.getName()).orElse(null);
     }
 
     private Set<Integer> getBookmarkedIds(User user, List<Integer> questionIds) {
-        if (questionIds == null || questionIds.isEmpty()) return Set.of();
+        if (user == null || questionIds == null || questionIds.isEmpty()) return Set.of();
         return questionBookmarkRepository.findAllByUserIdAndQuestionIdIn(user.getId(), questionIds).stream()
                 .map(bookmark -> bookmark.getQuestion().getId())
                 .collect(Collectors.toSet());
     }
 
     private Set<Integer> getPracticedIds(User user, List<Integer> questionIds) {
-        if (questionIds == null || questionIds.isEmpty()) return Set.of();
+        if (user == null || questionIds == null || questionIds.isEmpty()) return Set.of();
         return practiceAnswerRepository.findAllByPracticeSessionUserIdAndQuestionIdIn(user.getId(), questionIds).stream()
                 .map(answer -> answer.getQuestion().getId())
                 .collect(Collectors.toSet());

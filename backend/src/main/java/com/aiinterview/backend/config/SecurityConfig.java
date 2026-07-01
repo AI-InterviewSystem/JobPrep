@@ -22,6 +22,7 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.util.matcher.RegexRequestMatcher;
 import org.springframework.http.HttpMethod;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -54,6 +55,9 @@ public class SecurityConfig {
                         .requestMatchers("/auth/**").permitAll()
                         .requestMatchers("/files/upload").permitAll()
                         .requestMatchers("/pricing-plans/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/experience-levels").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/question-bank", "/question-bank/topics", "/question-bank/roles").permitAll()
+                        .requestMatchers(new RegexRequestMatcher("^/question-bank/[0-9]+$", "GET")).permitAll()
                         .requestMatchers("/payments/webhook").permitAll()
                         .requestMatchers(HttpMethod.POST, "/interview-sessions/*/recordings").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
