@@ -16,6 +16,7 @@ public class AdminDashboardResponse {
     private Statistics stats;
     private List<ChartDataPoint> revenueChart;
     private List<ChartDataPoint> userGrowthChart;
+    private Ga4Analytics ga4Analytics;
     private List<TopProduct> topProducts;
     private List<RecentCustomer> recentCustomers;
 
@@ -50,6 +51,49 @@ public class AdminDashboardResponse {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    public static class Ga4Analytics {
+        private boolean configured;
+        private String statusMessage;
+        private String measurementId;
+        private String propertyId;
+        private Long realtimeActiveUsers;
+        private Long activeUsers;
+        private Long totalUsers;
+        private Long sessions;
+        private Long pageViews;
+        private Double engagementRate;
+        private Double bounceRate;
+        private Double averageSessionDuration;
+        private List<ChartDataPoint> dailyActiveUsers;
+        private List<TopPage> topPages;
+        private List<TrafficSource> trafficSources;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class TopPage {
+        private String title;
+        private String path;
+        private long views;
+        private long activeUsers;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class TrafficSource {
+        private String source;
+        private long sessions;
+        private long totalUsers;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class TopProduct {
         private String name;
         private long orders;
@@ -70,3 +114,4 @@ public class AdminDashboardResponse {
         private String createdAt;
     }
 }
+

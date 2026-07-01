@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
-    FiSearch, FiTag, FiUsers, FiDollarSign, FiMoreHorizontal, FiTrendingUp, FiActivity, FiFileText, FiMessageSquare
+    FiSearch, FiTag, FiUsers, FiCreditCard, FiMoreHorizontal, FiTrendingUp, FiActivity, FiFileText, FiMessageSquare, FiGlobe, FiEye
 } from 'react-icons/fi';
 import { adminDashboardApi } from '../services/api';
 import { 
@@ -38,19 +38,23 @@ export default function AdminDashboard() {
         );
     }
 
-    const { stats, revenueChart, userGrowthChart, topProducts, recentCustomers } = data;
+    const { stats, revenueChart, userGrowthChart, ga4Analytics, topProducts, recentCustomers } = data;
 
     // Helper to format currency
-    const formatCurrency = (value) => {
-        return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'USD',
-        }).format(value);
-    };
+    const formatCurrency = (value) => `${new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(Number(value || 0))} VN\u0110`;
 
     // Helper to format large numbers
     const formatNumber = (value) => {
         return new Intl.NumberFormat('en-US').format(value);
+    };
+
+    const formatPercent = (value) => `${((value || 0) * 100).toFixed(1)}%`;
+
+    const formatDuration = (seconds) => {
+        const safeSeconds = Math.round(seconds || 0);
+        const minutes = Math.floor(safeSeconds / 60);
+        const remainder = safeSeconds % 60;
+        return minutes > 0 ? `${minutes}m ${remainder}s` : `${remainder}s`;
     };
 
     const CustomTooltip = ({ active, payload, label }) => {
@@ -74,18 +78,18 @@ export default function AdminDashboard() {
             className="space-y-6"
         >
             {/* Top Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-5">
                 {/* Revenue Card */}
-                <div className="bg-white p-6 rounded-[2rem] shadow-sm flex items-center gap-5 border border-slate-50">
-                    <div className="w-16 h-16 rounded-2xl bg-teal-500 flex items-center justify-center text-white shadow-lg shadow-teal-100">
+                <div className="bg-white p-5 rounded-[1.5rem] shadow-sm flex items-center gap-4 border border-slate-100 min-w-0 overflow-hidden">
+                    <div className="w-12 h-12 rounded-xl shrink-0 bg-teal-500 flex items-center justify-center text-white shadow-lg shadow-teal-100">
                         <FiTag className="text-2xl" />
                     </div>
-                    <div className="flex-1">
-                        <h3 className="text-gray-400 font-bold text-sm mb-1 uppercase tracking-wider">Total Revenue</h3>
+                    <div className="flex-1 min-w-0">
+                        <h3 className="text-gray-400 font-bold text-[11px] leading-tight mb-1 uppercase tracking-wider">Total Revenue</h3>
                         <div className="flex items-end justify-between">
                             <div>
-                                <p className="text-2xl font-black text-gray-900">{formatCurrency(stats.totalRevenue)}</p>
-                                <p className={`text-xs font-bold flex items-center gap-1 mt-1 ${stats.revenueGrowth >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                <p className="text-xl lg:text-2xl font-black text-gray-900 leading-tight break-words">{formatCurrency(stats.totalRevenue)}</p>
+                                <p className={`text-xs font-bold flex flex-wrap items-center gap-x-1 gap-y-0.5 mt-1 leading-tight ${stats.revenueGrowth >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                                     {stats.revenueGrowth >= 0 ? '+' : ''}{stats.revenueGrowth.toFixed(1)}% 
                                     <span className="text-gray-400 font-normal">last 30 days</span>
                                 </p>
@@ -94,39 +98,39 @@ export default function AdminDashboard() {
                     </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-[2rem] shadow-sm flex items-center gap-5 border border-slate-50">
-                    <div className="w-16 h-16 rounded-2xl bg-indigo-500 flex items-center justify-center text-white shadow-lg shadow-indigo-100">
+                <div className="bg-white p-5 rounded-[1.5rem] shadow-sm flex items-center gap-4 border border-slate-100 min-w-0 overflow-hidden">
+                    <div className="w-12 h-12 rounded-xl shrink-0 bg-indigo-500 flex items-center justify-center text-white shadow-lg shadow-indigo-100">
                         <FiFileText className="text-2xl" />
                     </div>
-                    <div className="flex-1">
-                        <h3 className="text-gray-400 font-bold text-sm mb-1 uppercase tracking-wider">Interviews</h3>
-                        <p className="text-2xl font-black text-gray-900">{formatNumber(stats.totalInterviewSessions || 0)}</p>
-                        <p className="text-xs text-gray-400 font-medium mt-1">{Number(stats.averageInterviewScore || 0).toFixed(1)} avg score</p>
+                    <div className="flex-1 min-w-0">
+                        <h3 className="text-gray-400 font-bold text-[11px] leading-tight mb-1 uppercase tracking-wider">Interviews</h3>
+                        <p className="text-xl lg:text-2xl font-black text-gray-900 leading-tight break-words">{formatNumber(stats.totalInterviewSessions || 0)}</p>
+                        <p className="text-xs text-gray-400 font-medium mt-1 leading-tight">{Number(stats.averageInterviewScore || 0).toFixed(1)} avg score</p>
                     </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-[2rem] shadow-sm flex items-center gap-5 border border-slate-50">
-                    <div className="w-16 h-16 rounded-2xl bg-amber-500 flex items-center justify-center text-white shadow-lg shadow-amber-100">
+                <div className="bg-white p-5 rounded-[1.5rem] shadow-sm flex items-center gap-4 border border-slate-100 min-w-0 overflow-hidden">
+                    <div className="w-12 h-12 rounded-xl shrink-0 bg-amber-500 flex items-center justify-center text-white shadow-lg shadow-amber-100">
                         <FiMessageSquare className="text-2xl" />
                     </div>
-                    <div className="flex-1">
-                        <h3 className="text-gray-400 font-bold text-sm mb-1 uppercase tracking-wider">Questions</h3>
-                        <p className="text-2xl font-black text-gray-900">{formatNumber(stats.totalQuestions || 0)}</p>
-                        <p className="text-xs text-gray-400 font-medium mt-1">{formatNumber(stats.activeSubscriptions || 0)} active subscriptions</p>
+                    <div className="flex-1 min-w-0">
+                        <h3 className="text-gray-400 font-bold text-[11px] leading-tight mb-1 uppercase tracking-wider">Questions</h3>
+                        <p className="text-xl lg:text-2xl font-black text-gray-900 leading-tight break-words">{formatNumber(stats.totalQuestions || 0)}</p>
+                        <p className="text-xs text-gray-400 font-medium mt-1 leading-tight">{formatNumber(stats.activeSubscriptions || 0)} active subscriptions</p>
                     </div>
                 </div>
 
                 {/* Users Card */}
-                <div className="bg-white p-6 rounded-[2rem] shadow-sm flex items-center gap-5 border border-slate-50">
-                    <div className="w-16 h-16 rounded-2xl bg-sky-500 flex items-center justify-center text-white shadow-lg shadow-sky-100">
+                <div className="bg-white p-5 rounded-[1.5rem] shadow-sm flex items-center gap-4 border border-slate-100 min-w-0 overflow-hidden">
+                    <div className="w-12 h-12 rounded-xl shrink-0 bg-sky-500 flex items-center justify-center text-white shadow-lg shadow-sky-100">
                         <FiUsers className="text-2xl" />
                     </div>
-                    <div className="flex-1">
-                        <h3 className="text-gray-400 font-bold text-sm mb-1 uppercase tracking-wider">Total Users</h3>
+                    <div className="flex-1 min-w-0">
+                        <h3 className="text-gray-400 font-bold text-[11px] leading-tight mb-1 uppercase tracking-wider">Total Users</h3>
                         <div className="flex items-end justify-between">
                             <div>
-                                <p className="text-2xl font-black text-gray-900">{formatNumber(stats.totalUsers)}</p>
-                                <p className={`text-xs font-bold flex items-center gap-1 mt-1 ${stats.userGrowth >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                <p className="text-xl lg:text-2xl font-black text-gray-900 leading-tight break-words">{formatNumber(stats.totalUsers)}</p>
+                                <p className={`text-xs font-bold flex flex-wrap items-center gap-x-1 gap-y-0.5 mt-1 leading-tight ${stats.userGrowth >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                                     {stats.userGrowth >= 0 ? '+' : ''}{stats.userGrowth.toFixed(1)}%
                                     <span className="text-gray-400 font-normal">last 30 days</span>
                                 </p>
@@ -136,16 +140,16 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* Avg Revenue Card */}
-                <div className="bg-white p-6 rounded-[2rem] shadow-sm flex items-center gap-5 border border-slate-50">
-                    <div className="w-16 h-16 rounded-2xl bg-rose-500 flex items-center justify-center text-white shadow-lg shadow-rose-100">
-                        <FiDollarSign className="text-2xl" />
+                <div className="bg-white p-5 rounded-[1.5rem] shadow-sm flex items-center gap-4 border border-slate-100 min-w-0 overflow-hidden">
+                    <div className="w-12 h-12 rounded-xl shrink-0 bg-rose-500 flex items-center justify-center text-white shadow-lg shadow-rose-100">
+                        <FiCreditCard className="text-2xl" />
                     </div>
-                    <div className="flex-1">
-                        <h3 className="text-gray-400 font-bold text-sm mb-1 uppercase tracking-wider">Avg Order Value</h3>
+                    <div className="flex-1 min-w-0">
+                        <h3 className="text-gray-400 font-bold text-[11px] leading-tight mb-1 uppercase tracking-wider">Avg Order Value</h3>
                         <div className="flex items-end justify-between">
                             <div>
-                                <p className="text-2xl font-black text-gray-900">{formatCurrency(stats.avgRevenuePerOrder)}</p>
-                                <p className="text-xs text-emerald-500 font-bold flex items-center gap-1 mt-1">
+                                <p className="text-xl lg:text-2xl font-black text-gray-900 leading-tight break-words">{formatCurrency(stats.avgRevenuePerOrder)}</p>
+                                <p className="text-xs text-emerald-500 font-bold flex flex-wrap items-center gap-x-1 gap-y-0.5 mt-1 leading-tight">
                                     <FiActivity className="text-xs" />
                                     Active Platform
                                 </p>
@@ -158,7 +162,7 @@ export default function AdminDashboard() {
             {/* Charts Section */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Revenue Trend Chart */}
-                <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-50">
+                <div className="bg-white p-6 lg:p-8 rounded-[1.5rem] shadow-sm border border-slate-100 overflow-hidden">
                     <div className="flex justify-between items-center mb-8">
                         <div>
                             <h3 className="font-black text-xl text-gray-900">Revenue Trend</h3>
@@ -205,7 +209,7 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* User Growth Chart */}
-                <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-50">
+                <div className="bg-white p-6 lg:p-8 rounded-[1.5rem] shadow-sm border border-slate-100 overflow-hidden">
                     <div className="flex justify-between items-center mb-8">
                         <div>
                             <h3 className="font-black text-xl text-gray-900">User Acquisition</h3>
@@ -238,6 +242,112 @@ export default function AdminDashboard() {
                                 </Bar>
                             </BarChart>
                         </ResponsiveContainer>
+                    </div>
+                </div>
+            </div>
+
+            {/* GA4 Website Analytics */}
+            <div className="bg-white p-6 lg:p-8 rounded-[1.5rem] shadow-sm border border-slate-100 overflow-hidden">
+                <div className="mb-8">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex shrink-0 items-center justify-center text-emerald-600">
+                            <FiGlobe />
+                        </div>
+                        <h3 className="font-black text-xl text-gray-900">GA4 Website Traffic</h3>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
+                    <div className="rounded-2xl bg-slate-50 p-4 border border-slate-100">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Realtime</p>
+                        <p className="text-xl lg:text-2xl font-black text-gray-900 leading-tight break-words">{formatNumber(ga4Analytics?.realtimeActiveUsers || 0)}</p>
+                        <p className="text-xs text-gray-400 font-medium">active now</p>
+                    </div>
+                    <div className="rounded-2xl bg-slate-50 p-4 border border-slate-100">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Active Users</p>
+                        <p className="text-xl lg:text-2xl font-black text-gray-900 leading-tight break-words">{formatNumber(ga4Analytics?.activeUsers || 0)}</p>
+                        <p className="text-xs text-gray-400 font-medium">last 30 days</p>
+                    </div>
+                    <div className="rounded-2xl bg-slate-50 p-4 border border-slate-100">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Sessions</p>
+                        <p className="text-xl lg:text-2xl font-black text-gray-900 leading-tight break-words">{formatNumber(ga4Analytics?.sessions || 0)}</p>
+                        <p className="text-xs text-gray-400 font-medium">visits</p>
+                    </div>
+                    <div className="rounded-2xl bg-slate-50 p-4 border border-slate-100">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Page Views</p>
+                        <p className="text-xl lg:text-2xl font-black text-gray-900 leading-tight break-words">{formatNumber(ga4Analytics?.pageViews || 0)}</p>
+                        <p className="text-xs text-gray-400 font-medium">screens/pages</p>
+                    </div>
+                    <div className="rounded-2xl bg-slate-50 p-4 border border-slate-100">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Engagement</p>
+                        <p className="text-xl lg:text-2xl font-black text-gray-900 leading-tight break-words">{formatPercent(ga4Analytics?.engagementRate)}</p>
+                        <p className="text-xs text-gray-400 font-medium">rate</p>
+                    </div>
+                    <div className="rounded-2xl bg-slate-50 p-4 border border-slate-100">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Avg Duration</p>
+                        <p className="text-xl lg:text-2xl font-black text-gray-900 leading-tight break-words">{formatDuration(ga4Analytics?.averageSessionDuration)}</p>
+                        <p className="text-xs text-gray-400 font-medium">per session</p>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                    <div className="xl:col-span-2 min-h-72">
+                        <div className="flex items-center justify-between mb-4">
+                            <h4 className="font-black text-gray-900">Daily Active Users</h4>
+                            <FiEye className="text-gray-300" />
+                        </div>
+                        <div className="h-64 w-full">
+                            {(ga4Analytics?.dailyActiveUsers || []).length > 0 ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={ga4Analytics.dailyActiveUsers}>
+                                        <defs>
+                                            <linearGradient id="colorGa4" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#10b981" stopOpacity={0.18}/>
+                                                <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                        <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10}} tickFormatter={(str) => new Date(str).getDate()} />
+                                        <YAxis hide />
+                                        <Tooltip content={<CustomTooltip />} />
+                                        <Area type="monotone" dataKey="value" name="Active Users" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorGa4)" />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="h-full flex items-center justify-center text-sm text-gray-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                                    No GA4 chart data available
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="space-y-6">
+                        <div>
+                            <h4 className="font-black text-gray-900 mb-4">Top Pages</h4>
+                            <div className="space-y-3">
+                                {(ga4Analytics?.topPages || []).length > 0 ? ga4Analytics.topPages.map((page, index) => (
+                                    <div key={`${page.path}-${index}`} className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 p-4 border border-slate-100">
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-bold text-gray-900 truncate">{page.title}</p>
+                                            <p className="text-xs text-gray-400 truncate">{page.path}</p>
+                                        </div>
+                                        <p className="text-sm font-black text-gray-900 whitespace-nowrap">{formatNumber(page.views)}</p>
+                                    </div>
+                                )) : <p className="text-sm text-gray-400 bg-slate-50 rounded-2xl p-4 border border-dashed border-slate-200">No page data available</p>}
+                            </div>
+                        </div>
+
+                        <div>
+                            <h4 className="font-black text-gray-900 mb-4">Traffic Sources</h4>
+                            <div className="space-y-3">
+                                {(ga4Analytics?.trafficSources || []).length > 0 ? ga4Analytics.trafficSources.map((source, index) => (
+                                    <div key={`${source.source}-${index}`} className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 p-4 border border-slate-100">
+                                        <p className="text-sm font-bold text-gray-900 truncate">{source.source}</p>
+                                        <p className="text-sm font-black text-gray-900 whitespace-nowrap">{formatNumber(source.sessions)}</p>
+                                    </div>
+                                )) : <p className="text-sm text-gray-400 bg-slate-50 rounded-2xl p-4 border border-dashed border-slate-200">No source data available</p>}
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -299,7 +409,7 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* New Customers */}
-                <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-50">
+                <div className="bg-white p-6 lg:p-8 rounded-[1.5rem] shadow-sm border border-slate-100 overflow-hidden">
                     <div className="flex justify-between items-center mb-8">
                         <h3 className="font-black text-xl text-gray-900">New Users</h3>
                         <button className="text-gray-300 hover:text-primary transition-colors">
@@ -341,3 +451,9 @@ export default function AdminDashboard() {
         </motion.div>
     );
 }
+
+
+
+
+
+
