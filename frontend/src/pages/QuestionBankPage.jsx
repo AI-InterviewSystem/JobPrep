@@ -114,7 +114,7 @@ export default function QuestionBankPage() {
                 page: currentPage - 1,
                 size: pageSize
             };
-            const response = await questionBankApi.list(params, { skipAuthRedirect: true });
+            const response = await questionBankApi.list(params);
             const data = response.data;
             setQuestions(data.questions || []);
             setTotalPages(data.totalPages || 1);
@@ -130,7 +130,7 @@ export default function QuestionBankPage() {
     const openQuestion = async (question) => {
         try {
             setDetailLoading(true);
-            const response = await questionBankApi.get(question.id, { skipAuthRedirect: true });
+            const response = await questionBankApi.get(question.id);
             setSelectedQuestion(response.data);
             setPracticeAnswer('');
             setPracticeFeedback(null);
@@ -571,3 +571,4 @@ export default function QuestionBankPage() {
         </main>
     );
 }
+
