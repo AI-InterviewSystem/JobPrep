@@ -114,14 +114,14 @@ export default function QuestionBankPage() {
                 page: currentPage - 1,
                 size: pageSize
             };
-            const response = await questionBankApi.list(params);
+            const response = await questionBankApi.list(params, { skipAuthRedirect: true });
             const data = response.data;
             setQuestions(data.questions || []);
             setTotalPages(data.totalPages || 1);
             setTotalElements(data.totalElements || 0);
         } catch (error) {
+            console.error('[QuestionBank] fetchQuestions error:', error?.response?.status, error?.response?.data);
             toast.error('Failed to load questions');
-            console.error(error);
         } finally {
             setLoading(false);
         }
@@ -259,7 +259,7 @@ export default function QuestionBankPage() {
                 if (sub && sub.practiceQuestionsLimit !== -1 && sub.practiceQuestionsUsed >= sub.practiceQuestionsLimit) {
                     setPracticeLimitReached(true);
                 }
-            } catch (_) {}
+            } catch (_) { }
         } catch (error) {
             toast.error(error?.response?.data?.message || 'Failed to submit answer');
             console.error(error);
@@ -390,7 +390,7 @@ export default function QuestionBankPage() {
                                     </article>
                                 ))}
                             </div>
-                            
+
                             {/* Pagination Controls */}
                             <div className="flex flex-wrap items-center justify-between border-t border-gray-100 px-6 py-4 bg-slate-50/50">
                                 <div className="text-sm text-gray-500 mb-2 sm:mb-0">
@@ -408,7 +408,7 @@ export default function QuestionBankPage() {
                                     >
                                         Previous
                                     </button>
-                                    
+
                                     {Array.from({ length: totalPages }, (_, i) => i + 1)
                                         .filter(page => page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1)
                                         .map((page, index, array) => {
@@ -418,11 +418,10 @@ export default function QuestionBankPage() {
                                                     {showEllipsis && <span className="px-2 text-gray-400 text-sm">...</span>}
                                                     <button
                                                         onClick={() => setCurrentPage(page)}
-                                                        className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors cursor-pointer ${
-                                                            currentPage === page
+                                                        className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors cursor-pointer ${currentPage === page
                                                                 ? 'bg-primary text-white'
                                                                 : 'border border-gray-200 bg-white text-gray-600 hover:bg-slate-50'
-                                                        }`}
+                                                            }`}
                                                     >
                                                         {page}
                                                     </button>

@@ -56,41 +56,37 @@ public class SecurityConfig {
                         .requestMatchers("/files/upload").permitAll()
                         .requestMatchers("/pricing-plans/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/experience-levels").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/question-bank", "/question-bank/topics", "/question-bank/roles").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/question-bank").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/question-bank/topics").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/question-bank/roles").permitAll()
                         .requestMatchers(new RegexRequestMatcher("^/question-bank/[0-9]+$", "GET")).permitAll()
                         .requestMatchers("/payments/webhook").permitAll()
                         .requestMatchers(HttpMethod.POST, "/interview-sessions/*/recordings").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
-                        .anyRequest().authenticated()
-                )
+                        .anyRequest().authenticated())
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint((request, response, authException) -> {
                             response.setStatus(jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED);
                             response.setContentType("application/json");
                             response.getWriter().write("{\"message\":\"Unauthorized\"}");
-                        })
-                )
+                        }))
                 .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                )
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .oauth2Login(oauth2 -> oauth2
                         .userInfoEndpoint(userInfo -> userInfo
                                 .userService(customOAuth2UserService)
                                 .oidcUserService(oidcRequest -> {
-                                    org.springframework.security.oauth2.core.oidc.user.OidcUser oidcUser =
-                                            new OidcUserService().loadUser(oidcRequest);
+                                    org.springframework.security.oauth2.core.oidc.user.OidcUser oidcUser = new OidcUserService()
+                                            .loadUser(oidcRequest);
                                     userService.upsertGoogleUser(
                                             oidcUser.getAttribute("email"),
                                             oidcUser.getAttribute("sub"),
                                             oidcUser.getAttribute("name"),
-                                            oidcUser.getAttribute("picture")
-                                    );
+                                            oidcUser.getAttribute("picture"));
                                     return oidcUser;
-                                })
-                        )
-                        .successHandler(oauth2SuccessHandler())
-                );
+                                }))
+                        .successHandler(oauth2SuccessHandler()));
 
         return http.build();
     }
