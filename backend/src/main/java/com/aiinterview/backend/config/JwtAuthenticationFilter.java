@@ -15,10 +15,17 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
+    private static final Set<String> PUBLIC_GET_PATHS = Set.of(
+            "/experience-levels",
+            "/question-bank/topics",
+            "/question-bank/roles",
+            "/pricing-plans"
+    );
 
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
@@ -29,6 +36,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain
     ) throws ServletException, IOException {
+        if (isPublicMetadataRequest(request)) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         final String authHeader = request.getHeader("Authorization");
         final String jwt;
         final String userEmail;
@@ -57,5 +69,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             // Ignore invalid/expired tokens and let Security handle the rest
         }
         filterChain.doFilter(request, response);
+    }
+
+    private boolean isPublicMetadataRequest(HttpServletRequest request) {
+        if (!"GET".equalsIgnoreCase(request.getMethod())) {
+            return false;
+        }
+
+        String path = request.getRequestURI();
+        String contextPath = request.getContextPath();
+        if (contextPath != null && !contextPath.isBlank() && path.startsWith(contextPath)) {
+            path = path.substring(contextPath.length());
+        }
+
+        return PUBLIC_GET_PATHS.contains(path) || path.startsWith("/pricing-plans/");
     }
 }

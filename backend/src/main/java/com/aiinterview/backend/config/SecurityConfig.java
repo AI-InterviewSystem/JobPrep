@@ -5,6 +5,7 @@ import com.aiinterview.backend.service.CustomOAuth2UserService;
 import com.aiinterview.backend.service.JwtService;
 import com.aiinterview.backend.service.UserPrincipal;
 import com.aiinterview.backend.service.UserService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -31,11 +32,20 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
+    private static final Set<String> PUBLIC_GET_PATHS = Set.of(
+            "/experience-levels",
+            "/question-bank",
+            "/question-bank/topics",
+            "/question-bank/roles",
+            "/pricing-plans"
+    );
+
 
     @Value("${app.frontend.url}")
     private String frontendUrl;
@@ -53,6 +63,7 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers(SecurityConfig::isPublicGetRequest).permitAll()
                         .requestMatchers(AntPathRequestMatcher.antMatcher("/auth/**")).permitAll()
                         .requestMatchers(AntPathRequestMatcher.antMatcher("/error")).permitAll()
                         .requestMatchers(AntPathRequestMatcher.antMatcher("/files/upload")).permitAll()
@@ -96,6 +107,22 @@ public class SecurityConfig {
                         .successHandler(oauth2SuccessHandler()));
 
         return http.build();
+    }
+
+    private static boolean isPublicGetRequest(HttpServletRequest request) {
+        if (!HttpMethod.GET.matches(request.getMethod())) {
+            return false;
+        }
+
+        String path = request.getRequestURI();
+        String contextPath = request.getContextPath();
+        if (contextPath != null && !contextPath.isBlank() && path.startsWith(contextPath)) {
+            path = path.substring(contextPath.length());
+        }
+
+        return PUBLIC_GET_PATHS.contains(path)
+                || path.startsWith("/pricing-plans/")
+                || path.matches("^/question-bank/[0-9]+$");
     }
 
     @Bean

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { storage } from './storage';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/ai-interview';
 
@@ -6,13 +7,37 @@ const api = axios.create({
     baseURL: API_BASE_URL,
 });
 
-import { storage } from './storage';
+const isExpiredJwt = (token) => {
+    const parts = token?.split('.');
+    if (!parts || parts.length !== 3) return true;
+
+    try {
+        const payloadPart = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+        const paddedPayload = payloadPart.padEnd(payloadPart.length + (4 - payloadPart.length % 4) % 4, '=');
+        const payload = JSON.parse(window.atob(paddedPayload));
+        return typeof payload.exp !== 'number' || payload.exp * 1000 <= Date.now();
+    } catch {
+        return true;
+    }
+};
+
+const getUsableToken = () => {
+    const token = storage.getToken();
+    if (!token) return null;
+    if (isExpiredJwt(token)) {
+        storage.clearAuth();
+        window.dispatchEvent(new Event('jobprep:user-updated'));
+        return null;
+    }
+    return token;
+};
 
 // Add a request interceptor to attach the JWT token to every request
 api.interceptors.request.use(
     (config) => {
-        const token = storage.getToken();
+        const token = config.skipAuth ? null : getUsableToken();
         if (token) {
+            config.headers = config.headers || {};
             config.headers.Authorization = `Bearer ${token}`;
         }
         if (import.meta.env.DEV && config.url?.startsWith('/admin/')) {
@@ -32,7 +57,8 @@ api.interceptors.response.use(
         const status = error?.response?.status;
         const requestUrl = error?.config?.url || '';
         const skipAuthRedirect = Boolean(error?.config?.skipAuthRedirect);
-        if (status === 401 && !requestUrl.startsWith('/auth/') && !skipAuthRedirect) {
+        const skipAuth = Boolean(error?.config?.skipAuth);
+        if (status === 401 && !requestUrl.startsWith('/auth/') && !skipAuthRedirect && !skipAuth) {
             storage.clearAuth();
             window.dispatchEvent(new Event('jobprep:user-updated'));
             if (!window.location.pathname.includes('/login')) {
@@ -87,7 +113,7 @@ export const jobDescriptionApi = {
 };
 
 export const experienceLevelsApi = {
-    getActive: (config = {}) => api.get('/experience-levels', config),
+    getActive: (config = {}) => api.get('/experience-levels', { skipAuth: true, ...config }),
 };
 
 export const dashboardApi = {
@@ -108,8 +134,8 @@ export const notificationApi = {
 export const questionBankApi = {
     list: (params, config = {}) => api.get('/question-bank', { ...config, params }),
     get: (id, config = {}) => api.get(`/question-bank/${id}`, config),
-    getTopics: (config = {}) => api.get('/question-bank/topics', config),
-    getRoles: (config = {}) => api.get('/question-bank/roles', config),
+    getTopics: (config = {}) => api.get('/question-bank/topics', { skipAuth: true, ...config }),
+    getRoles: (config = {}) => api.get('/question-bank/roles', { skipAuth: true, ...config }),
     getBookmarks: (config = {}) => api.get('/question-bank/bookmarks', config),
     bookmark: (id) => api.post(`/question-bank/${id}/bookmark`),
     removeBookmark: (id) => api.delete(`/question-bank/${id}/bookmark`),
