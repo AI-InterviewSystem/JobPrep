@@ -21,7 +21,6 @@ const LiveInterviewPage = lazy(() => import("../pages/LiveInterviewPage"))
 const InterviewResultPage = lazy(() => import("../pages/InterviewResultPage"))
 const InterviewHistoryPage = lazy(() => import("../pages/InterviewHistoryPage"))
 const QuestionBankPage = lazy(() => import("../pages/QuestionBankPage"))
-const OtpPage = lazy(() => import("../pages/OtpPage"))
 const AdminDashboard = lazy(() => import("../pages/AdminDashboard"))
 const AdminUsersPage = lazy(() => import("../pages/AdminUsersPage"))
 const AdminInterviewSessionsPage = lazy(() => import("../pages/AdminInterviewSessionsPage"))
@@ -68,7 +67,6 @@ export default function AppRoutes() {
                     <Route path="/login" element={<LoginPage />} />
                     <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                     <Route path="/reset-password" element={<ResetPasswordPage />} />
-                    <Route path="/verify-otp" element={<OtpPage />} />
                     <Route path="/auth/google-callback" element={<GoogleCallback />} />
 
                     <Route path="/pricing" element={<PricingPage />} />

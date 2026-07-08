@@ -74,7 +74,6 @@ export const authApi = {
     login: (data) => api.post('/auth/login', data),
     forgotPassword: (data) => api.post('/auth/forgot-password', data),
     resetPassword: (data) => api.post('/auth/reset-password', data),
-    verifyOtp: (data) => api.post('/auth/verify-otp', data),
     logout: () => api.post('/auth/logout'),
 };
 
