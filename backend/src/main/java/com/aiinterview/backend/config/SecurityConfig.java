@@ -22,6 +22,7 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.security.web.util.matcher.RegexRequestMatcher;
 import org.springframework.http.HttpMethod;
 import org.springframework.web.cors.CorsConfiguration;
@@ -52,17 +53,22 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/auth/**").permitAll()
-                        .requestMatchers("/files/upload").permitAll()
-                        .requestMatchers("/pricing-plans/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/experience-levels").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/question-bank").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/question-bank/topics").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/question-bank/roles").permitAll()
+                        .requestMatchers(AntPathRequestMatcher.antMatcher("/auth/**")).permitAll()
+                        .requestMatchers(AntPathRequestMatcher.antMatcher("/files/upload")).permitAll()
+                        .requestMatchers(AntPathRequestMatcher.antMatcher("/pricing-plans/**")).permitAll()
+                        .requestMatchers(AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/experience-levels"))
+                        .permitAll()
+                        .requestMatchers(AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/question-bank")).permitAll()
+                        .requestMatchers(AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/question-bank/topics"))
+                        .permitAll()
+                        .requestMatchers(AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/question-bank/roles"))
+                        .permitAll()
                         .requestMatchers(new RegexRequestMatcher("^/question-bank/[0-9]+$", "GET")).permitAll()
-                        .requestMatchers("/payments/webhook").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/interview-sessions/*/recordings").permitAll()
-                        .requestMatchers("/admin/**").hasRole("ADMIN")
+                        .requestMatchers(AntPathRequestMatcher.antMatcher("/payments/webhook")).permitAll()
+                        .requestMatchers(
+                                AntPathRequestMatcher.antMatcher(HttpMethod.POST, "/interview-sessions/*/recordings"))
+                        .permitAll()
+                        .requestMatchers(AntPathRequestMatcher.antMatcher("/admin/**")).hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint((request, response, authException) -> {
