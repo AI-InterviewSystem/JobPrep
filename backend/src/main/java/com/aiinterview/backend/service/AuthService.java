@@ -4,11 +4,9 @@ import com.aiinterview.backend.dto.*;
 import com.aiinterview.backend.entity.PasswordResetToken;
 import com.aiinterview.backend.entity.Profile;
 import com.aiinterview.backend.entity.User;
-import com.aiinterview.backend.entity.VerificationOtp;
 import com.aiinterview.backend.exception.AppException;
 import com.aiinterview.backend.repository.PasswordResetTokenRepository;
 import com.aiinterview.backend.repository.UserRepository;
-import com.aiinterview.backend.repository.VerificationOtpRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -30,7 +28,6 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final PasswordResetTokenRepository tokenRepository;
-    private final VerificationOtpRepository otpRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final EmailService emailService;
@@ -92,8 +89,8 @@ public class AuthService {
         User user = User.builder()
                 .email(request.getEmail())
                 .passwordHash(passwordEncoder.encode(password))
-                .emailVerified(false)
-                .isActive(false) // Deactivated until OTP is verified
+                .emailVerified(true)
+                .isActive(true)
                 .isBanned(false)
                 .build();
 
@@ -106,56 +103,16 @@ public class AuthService {
 
         User savedUser = userRepository.save(user);
 
-        // Generate and send OTP
-        String otp = String.format("%06d", new java.util.Random().nextInt(1000000));
-        VerificationOtp verificationOtp = VerificationOtp.builder()
-                .otpCode(otp)
-                .user(savedUser)
-                .expiryDate(LocalDateTime.now().plusMinutes(15))
-                .build();
-        
-        otpRepository.save(verificationOtp);
-
-        emailService.sendEmail(savedUser.getEmail(), "Account Verification Code", 
-                "Your verification code is: " + otp + "\nThis code will expire in 15 minutes.");
-
-        return AuthResponse.builder()
-                .user(AuthResponse.UserDto.builder()
-                        .id(savedUser.getId())
-                        .email(savedUser.getEmail())
-                        .emailVerified(savedUser.getEmailVerified())
-                        .role(savedUser.getRole())
-                        .build())
-                .build();
-    }
-
-    @Transactional
-    public AuthResponse verifyOtp(VerifyOtpRequest request) {
-        VerificationOtp otp = otpRepository.findByOtpCodeAndUserEmail(request.getOtpCode(), request.getEmail())
-                .orElseThrow(() -> new AppException("Invalid OTP code"));
-
-        if (otp.isExpired()) {
-            otpRepository.delete(otp);
-            throw new AppException("OTP has expired");
-        }
-
-        User user = otp.getUser();
-        user.setEmailVerified(true);
-        user.setIsActive(true);
-        userRepository.save(user);
-
-        otpRepository.delete(otp);
-
-        var userPrincipal = new UserPrincipal(user);
+        var userPrincipal = new UserPrincipal(savedUser);
         String token = jwtService.generateToken(userPrincipal);
 
         return AuthResponse.builder()
                 .token(token)
                 .user(AuthResponse.UserDto.builder()
-                        .id(user.getId())
-                        .email(user.getEmail())
-                        .emailVerified(user.getEmailVerified())
-                        .role(user.getRole())
+                        .id(savedUser.getId())
+                        .email(savedUser.getEmail())
+                        .emailVerified(savedUser.getEmailVerified())
+                        .role(savedUser.getRole())
                         .build())
                 .build();
     }

@@ -2,7 +2,7 @@ import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { motion } from "framer-motion"
 import { authApi } from "../services/api"
-import logo from "../assets/images/jobprep-logo.png"
+import { storage } from "../services/storage"
 
 export default function SignupPage() {
     const [formData, setFormData] = useState({
@@ -41,9 +41,9 @@ export default function SignupPage() {
         try {
             // Send only required data to backend
             const { confirmPassword, ...registerData } = formData
-            await authApi.register(registerData)
-            // Redirect to OTP page instead of dashboard
-            navigate(`/verify-otp?email=${encodeURIComponent(formData.email)}`)
+            const response = await authApi.register(registerData)
+            storage.setAuth(response.data.token, response.data.user, false)
+            navigate("/dashboard")
         } catch (err) {
             if (err.response?.data) {
                 setError(err.response.data)
